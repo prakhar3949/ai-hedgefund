@@ -1,0 +1,17 @@
+#!/bin/bash
+# ChatGPT CLI wrapper using shell-gpt (sgpt)
+# Usage: chatgpt "your query here"
+# Shell mode: chatgpt -s "generate shell command"
+# Code mode: chatgpt -c "generate code"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV_PATH="$SCRIPT_DIR/../venv-sgpt"
+
+# Load OpenAI API key if available
+CREDENTIALS_DIR="$SCRIPT_DIR/../credentials"
+if [ -f "$CREDENTIALS_DIR/openai-api-key.txt" ]; then
+    export OPENAI_API_KEY=$(cat "$CREDENTIALS_DIR/openai-api-key.txt")
+fi
+
+# Run sgpt from virtual environment
+"$VENV_PATH/bin/sgpt" "$@"

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m spx_models.data.fetch_yahoo_macro)",
+      "Bash(python -m spx_models.data.panel)",
+      "Bash(python -m spx_models.models.welch_goyal_expanded)",
+      "Bash(\"d:/Deepseek-ollama/venv/Scripts/python.exe\" \"d:/Deepseek-ollama/finance/cowork-1/wave3_score.py\")",
+      "PowerShell(& \"D:\\\\Deepseek-ollama\\\\venv\\\\python.exe\" \"D:\\\\Deepseek-ollama\\\\finance\\\\cowork-1\\\\wave3_score.py\")",
+      "PowerShell(& \"D:\\\\Deepseek-ollama\\\\venv\\\\python.exe\" -c \"import yfinance; print\\('yfinance', yfinance.__version__\\)\")",
+      "PowerShell(& \"D:\\\\Deepseek-ollama\\\\venv\\\\python.exe\" -m pip install --quiet yfinance)",
+      "PowerShell(& \"D:\\\\Deepseek-ollama\\\\venv\\\\python.exe\" -c \"import yfinance as yf; print\\('yfinance', yf.__version__\\)\")",
+      "Bash(PYTHONIOENCODING=utf-8 python run-ticker.py AMZN)"
+    ]
+  }
+}

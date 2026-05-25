@@ -1,0 +1,51 @@
+{
+  "_comment": "Watchlist — used by technicals-scanner, earnings-whisper, and other tools. Source: Purple list 2-14.",
+  "tickers": [
+    "RDDT", "MTH", "ODFL", "GME", "SKY", "COST", "FTAI", "OBK",
+    "JBHT", "NIC", "XPO", "GXO", "CHTR", "KRE", "WASH", "STEL",
+    "WMT", "FFBC", "BBT",
+    "MUFG", "MFG", "8411.T",
+    "MKSI", "CMI", "CAT", "STRL",
+    "TEM", "PFE", "TGT",
+    "VLO", "CVX", "HAL", "BKR",
+    "EWY"
+  ],
+  "stocks": {
+    "holdings": {
+      "RDDT": {"weight": 1},
+      "MTH": {"weight": 1},
+      "ODFL": {"weight": 1},
+      "GME": {"weight": 1},
+      "SKY": {"weight": 1},
+      "COST": {"weight": 1},
+      "FTAI": {"weight": 1},
+      "OBK": {"weight": 1},
+      "JBHT": {"weight": 1},
+      "NIC": {"weight": 1},
+      "XPO": {"weight": 1},
+      "GXO": {"weight": 1},
+      "CHTR": {"weight": 1},
+      "KRE": {"weight": 1},
+      "WASH": {"weight": 1},
+      "STEL": {"weight": 1},
+      "WMT": {"weight": 1},
+      "FFBC": {"weight": 1},
+      "BBT": {"weight": 1},
+      "MUFG": {"weight": 1},
+      "MFG": {"weight": 1},
+      "8411.T": {"weight": 1},
+      "MKSI": {"weight": 1},
+      "CMI": {"weight": 1},
+      "CAT": {"weight": 1},
+      "STRL": {"weight": 1},
+      "TEM": {"weight": 1},
+      "PFE": {"weight": 1},
+      "TGT": {"weight": 1},
+      "VLO": {"weight": 1},
+      "CVX": {"weight": 1},
+      "HAL": {"weight": 1},
+      "BKR": {"weight": 1},
+      "EWY": {"weight": 1}
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "positions": {
+    "NVDA": {
+      "entry_date": "2026-04-09",
+      "entry_price": 183.91,
+      "initial_shares": 15,
+      "target_shares": 100,
+      "parent_etf": "SMH",
+      "thesis": "AI compute leader, SMH bubble theme - Entry F SMA50 reclaim 2026-04-09. Stab 15% of intended 100-sh final position.",
+      "adds": [],
+      "current_stop": 175.00,
+      "status": "active"
+    }
+  }
+}

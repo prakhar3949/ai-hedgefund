@@ -1,0 +1,4 @@
+{
+  "_comment": "Tickers to evaluate as potential entry candidates. Edit freely. Loaded by entry-analyzer.py when no CLI args are provided.",
+  "tickers": ["FIVN", "BB", "AMRC", "GTLB", "BLDP", "SHLS"]
+}

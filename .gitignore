@@ -1,0 +1,80 @@
+# Credentials & secrets (credentials.example/ is intentionally tracked)
+credentials/
+!credentials.example/
+*-creds.*
+*.key
+*.pem
+.env
+
+# Internal AI context (not for public)
+.claude.md
+.clawdhub/
+.security-measures.md
+AGENTS.md
+IDENTITY.md
+SOUL.md
+USER.md
+HEARTBEAT.md
+MEMORY.md
+COMPLETE-SYSTEM-DELIVERY.md
+TOOLS.md
+TOOLS-INDEX.md
+THESIS-DEVELOPMENT.md
+
+# Working notes & plans
+overnight-plan.md
+desktop-pairing-*.txt
+desktop-pairing-*.md
+
+# Private data directories
+memory/
+output/
+analysis/
+research/
+canvas/
+vpn-configs/
+
+# Internal delivery docs in tools/
+tools/*README*.md
+tools/*QUICKSTART*.md
+tools/*DELIVERY*.md
+tools/*SUMMARY*.md
+tools/FAQ.md
+tools/MANIFEST.md
+tools/DO-NOT-HALLUCINATE.md
+tools/START-HERE-NICK.md
+tools/EXECUTIVE-SUMMARY.md
+tools/PRIORITY-UPDATE-DELIVERY.md
+tools/chatgpt-setup-guide.md
+tools/thesis-reasoning.md
+
+# Portfolio-sensitive config
+tools/position-tracker.json
+tools/response-templates.json
+tools/sentiment-screener-config.json
+tools/retail-vulnerability-config.json
+
+# Test files & coverage
+tools/test/
+htmlcov/
+
+# Logs
+logs/
+*.log
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# Dexter internals (has its own repo)
+tools/dexter/
+
+# Editor / OS
+.DS_Store
+*.swp
+*~
+backups/

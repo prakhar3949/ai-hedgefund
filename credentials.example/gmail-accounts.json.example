@@ -1,0 +1,10 @@
+{
+  "primary": {
+    "tokenPath": "~/clawd/credentials/google-token.json",
+    "email": "your-primary@gmail.com"
+  },
+  "secondary": {
+    "tokenPath": "~/clawd/credentials/google-token-secondary.json",
+    "email": "your-secondary@gmail.com"
+  }
+}

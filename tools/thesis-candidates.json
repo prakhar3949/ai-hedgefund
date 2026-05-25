@@ -1,0 +1,4 @@
+{
+  "_comment": "Input list for fundamental-thesis.py. CLI args override this file. Example: python fundamental-thesis.py NVDA AAPL MSFT",
+  "tickers": []
+}

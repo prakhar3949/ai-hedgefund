@@ -1,0 +1,245 @@
+{
+  "_comment": "Top holdings per subsector ETF. Update quarterly. Last updated: 2025-02.",
+  "SMH": {
+    "name": "Semiconductors",
+    "sector": "XLK",
+    "holdings": ["NVDA", "TSM", "AVGO", "AMD", "QCOM", "TXN", "AMAT", "LRCX", "KLAC", "MRVL", "MU", "ADI", "NXPI", "INTC", "ON", "MCHP", "ASML", "MPWR", "SWKS", "QRVO"]
+  },
+  "IGV": {
+    "name": "Software",
+    "sector": "XLK",
+    "holdings": ["MSFT", "ORCL", "CRM", "ADBE", "INTU", "NOW", "PANW", "SNPS", "CDNS", "WDAY", "ADSK", "ANSS", "FTNT", "ROP", "DDOG", "ZS", "CRWD", "TEAM", "HUBS", "PAYC"]
+  },
+  "CIBR": {
+    "name": "Cybersecurity",
+    "sector": "XLK",
+    "holdings": ["CRWD", "PANW", "FTNT", "ZS", "OKTA", "CYBR", "QLYS", "RPD", "TENB", "VRNS", "SAIL", "SASE", "NET", "S", "GEN", "LDOS", "BAH", "CSCO", "AKAM"]
+  },
+  "AIQ": {
+    "name": "AI & Big Data",
+    "sector": "XLK",
+    "holdings": ["META", "GOOGL", "MSFT", "AMZN", "NVDA", "CRM", "AMD", "PLTR", "SNOW", "MDB", "DDOG", "PATH", "AI", "SPLK", "TWLO", "VEEV", "ZM", "DOCU", "U", "COIN"]
+  },
+  "QTUM": {
+    "name": "Quantum/AI Computing",
+    "sector": "XLK",
+    "holdings": ["IONQ", "RGTI", "QBTS", "ARQQ", "QUBT", "HON", "IBM", "GOOG", "MSFT", "NVDA", "AMD", "INTC", "ACLS", "AMZN", "TSM", "BABA"]
+  },
+  "BOTZ": {
+    "name": "Robotics & AI",
+    "sector": "XLI",
+    "holdings": ["NVDA", "ISRG", "ABB", "FANUY", "ROK", "KUKA", "IRBT", "BRKS", "CGNX", "NOVT", "TER", "AZTA", "OFIX", "MKSI", "ZBRA", "NNDM"]
+  },
+  "IBB": {
+    "name": "Biotech",
+    "sector": "XLV",
+    "holdings": ["VRTX", "GILD", "AMGN", "REGN", "MRNA", "BIIB", "ILMN", "ALNY", "SGEN", "BMRN", "UTHR", "TECH", "EXEL", "NBIX", "INCY", "SRPT", "HZNP", "PCVX", "IONS", "RARE"]
+  },
+  "IHI": {
+    "name": "Medical Devices",
+    "sector": "XLV",
+    "holdings": ["ABT", "MDT", "ISRG", "SYK", "BSX", "EW", "BDX", "ZBH", "BAX", "HOLX", "ALGN", "DXCM", "PODD", "TFX", "STVN", "GMED", "NVST", "NVCR", "MMSI", "INSP"]
+  },
+  "ARKG": {
+    "name": "Genomics",
+    "sector": "XLV",
+    "holdings": ["CRSP", "EXAS", "BEAM", "NTLA", "PACB", "TWST", "FATE", "RGEN", "CDNA", "VEEV", "IOVA", "SDGR", "RXRX", "CERS", "MASS", "TXG"]
+  },
+  "KRE": {
+    "name": "Regional Banks",
+    "sector": "XLF",
+    "holdings": ["WAL", "FHN", "EWBC", "OZK", "ZION", "MTB", "RF", "HBAN", "CFG", "SNV", "CMA", "KEY", "FITB", "CFR", "SBCF", "FFIN", "PNFP", "GBCI", "BOKF", "UMBF"]
+  },
+  "ITB": {
+    "name": "Homebuilders",
+    "sector": "XLY",
+    "holdings": ["DHI", "LEN", "NVR", "PHM", "TOL", "MDC", "MHO", "KBH", "MTH", "TMHC", "CCS", "GRBK", "DFH", "SKY", "LGIH", "MRC", "CVCO", "IBP", "BLDR", "FBIN"]
+  },
+  "VNQ": {
+    "name": "REITs",
+    "sector": "XLRE",
+    "holdings": ["PLD", "AMT", "EQIX", "CCI", "PSA", "DLR", "O", "WELL", "SPG", "VICI", "AVB", "EQR", "IRM", "ARE", "SBAC", "MAA", "UDR", "EXR", "ESS", "INVH"]
+  },
+  "XRT": {
+    "name": "Retail",
+    "sector": "XLY",
+    "holdings": ["GME", "BURL", "ANF", "GPS", "KSS", "M", "DKS", "BBWI", "RL", "TPR", "FIVE", "TJX", "ROST", "HD", "LOW", "TGT", "COST", "WMT", "DLTR", "DG"]
+  },
+  "ITA": {
+    "name": "Aerospace & Defense",
+    "sector": "XLI",
+    "holdings": ["RTX", "BA", "LMT", "NOC", "GD", "LHX", "TDG", "HWM", "HII", "TXT", "ERJ", "AXON", "KTOS", "BWXT", "MOG.A", "HEI", "CW", "SPR", "AVAV", "RKLB"]
+  },
+  "IYT": {
+    "name": "Transportation",
+    "sector": "XLI",
+    "holdings": ["UNP", "UPS", "FDX", "CSX", "NSC", "ODFL", "XPO", "JBHT", "CHRW", "SAIA", "DAL", "UAL", "LUV", "AAL", "JBLU", "LSTR", "SNDR", "WERN", "KNX", "MATX"]
+  },
+  "JETS": {
+    "name": "Airlines",
+    "sector": "XLI",
+    "holdings": ["DAL", "UAL", "LUV", "AAL", "ALK", "JBLU", "HA", "SAVE", "MESA", "ALGT", "SKYW", "RYAAY", "BA", "GE", "RTX", "ATSG"]
+  },
+  "SLX": {
+    "name": "Steel",
+    "sector": "XLB",
+    "holdings": ["NUE", "STLD", "RS", "CLF", "X", "CMC", "ATI", "HAYN", "ZEUS", "WOR", "TMST", "SCHN", "SXC", "GGB", "PKX", "MT", "TX", "SID", "VALE"]
+  },
+  "GDX": {
+    "name": "Gold Miners",
+    "sector": "XLB",
+    "holdings": ["NEM", "AEM", "GOLD", "WPM", "FNV", "AGI", "KGC", "AU", "GFI", "BTG", "IAG", "PAAS", "HMY", "EGO", "CDE", "DRD", "EDV", "SSRM", "OR", "NGD"]
+  },
+  "SIL": {
+    "name": "Silver Miners",
+    "sector": "XLB",
+    "holdings": ["WPM", "PAAS", "AG", "MAG", "HL", "CDE", "EXK", "FSM", "SILV", "SVM", "FR", "SSRM", "FNV", "AEM", "ASR"]
+  },
+  "TAN": {
+    "name": "Solar",
+    "sector": "XLE",
+    "holdings": ["ENPH", "FSLR", "SEDG", "RUN", "NOVA", "ARRY", "MAXN", "CSIQ", "JKS", "SHLS", "GNRC", "ITRI", "SPWR", "FLNC", "STEM", "HASI"]
+  },
+  "KWEB": {
+    "name": "China Tech",
+    "sector": "XLC",
+    "holdings": ["BABA", "PDD", "JD", "BIDU", "NTES", "TCOM", "BILI", "MNSO", "ZTO", "KC", "LI", "NIO", "XPEV", "FUTU", "BZ", "VNET", "QFIN", "YMM"]
+  },
+  "SOCL": {
+    "name": "Social Media",
+    "sector": "XLC",
+    "holdings": ["META", "SNAP", "PINS", "MTCH", "RDDT", "BMBL", "TWLO", "ZM", "SPOT", "RBLX", "GOOGL", "NTES", "LINE", "BILI"]
+  },
+  "IYZ": {
+    "name": "Telecom",
+    "sector": "XLC",
+    "holdings": ["T", "VZ", "TMUS", "LUMN", "USM", "ATUS", "FYBR", "SHEN", "CNSL", "LBRDA", "CHTR", "CMCSA", "CCOI", "TDS", "BAND"]
+  },
+  "BETZ": {
+    "name": "Sports Betting",
+    "sector": "XLY",
+    "holdings": ["DKNG", "FLUT", "PENN", "MGM", "CZR", "WYNN", "BYD", "RSI", "GENI", "GAN", "BALY", "EVRI", "CHDN", "SRAD"]
+  },
+  "IBIT": {
+    "name": "Bitcoin",
+    "sector": "Crypto",
+    "holdings": []
+  },
+  "VUG": {
+    "name": "Growth",
+    "sector": "Broad",
+    "holdings": ["AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AVGO", "LLY", "V", "MA", "COST", "CRM", "NFLX", "AMD", "ADBE", "ACN", "NOW", "ISRG", "INTU"]
+  },
+  "RSPT": {
+    "name": "EW Technology",
+    "sector": "XLK",
+    "holdings": ["AAPL", "MSFT", "NVDA", "AVGO", "CRM", "AMD", "ADBE", "ACN", "CSCO", "ORCL", "INTU", "IBM", "NOW", "TXN", "QCOM", "AMAT", "ADI", "LRCX", "SNPS", "CDNS"]
+  },
+  "RSPF": {
+    "name": "EW Financials",
+    "sector": "XLF",
+    "holdings": ["BRK.B", "JPM", "V", "MA", "BAC", "WFC", "GS", "MS", "SPGI", "BLK", "AXP", "C", "MMC", "CB", "PGR", "ICE", "CME", "AON", "SCHW", "MCO"]
+  },
+  "RSPG": {
+    "name": "EW Energy",
+    "sector": "XLE",
+    "holdings": ["XOM", "CVX", "COP", "EOG", "SLB", "MPC", "PSX", "PXD", "VLO", "OXY", "WMB", "HES", "HAL", "DVN", "FANG", "BKR", "KMI", "TRGP", "OKE", "CTRA"]
+  },
+  "RSPH": {
+    "name": "EW Health Care",
+    "sector": "XLV",
+    "holdings": ["LLY", "UNH", "JNJ", "MRK", "ABT", "TMO", "PFE", "ABBV", "DHR", "AMGN", "MDT", "BMY", "ISRG", "SYK", "GILD", "CI", "ELV", "VRTX", "BSX", "REGN"]
+  },
+  "RSPN": {
+    "name": "EW Industrials",
+    "sector": "XLI",
+    "holdings": ["GE", "CAT", "RTX", "HON", "UNP", "BA", "DE", "UPS", "LMT", "ADP", "GD", "ITW", "NOC", "WM", "ETN", "FDX", "CSX", "PH", "EMR", "TDG"]
+  },
+  "RSPS": {
+    "name": "EW Consumer Staples",
+    "sector": "XLP",
+    "holdings": ["PG", "PEP", "KO", "COST", "WMT", "PM", "MO", "MDLZ", "CL", "ADM", "GIS", "SYY", "KMB", "STZ", "HSY", "KHC", "KR", "MKC", "CHD", "TSN"]
+  },
+  "RSPD": {
+    "name": "EW Consumer Discretionary",
+    "sector": "XLY",
+    "holdings": ["AMZN", "TSLA", "HD", "MCD", "NKE", "LOW", "SBUX", "TJX", "BKNG", "MAR", "ORLY", "AZO", "ROST", "DHI", "GM", "F", "LEN", "CMG", "YUM", "EBAY"]
+  },
+  "RSPU": {
+    "name": "EW Utilities",
+    "sector": "XLU",
+    "holdings": ["NEE", "DUK", "SO", "D", "SRE", "AEP", "EXC", "XEL", "ED", "WEC", "ES", "PEG", "EIX", "AWK", "DTE", "ETR", "FE", "PPL", "AES", "CMS"]
+  },
+  "RSPC": {
+    "name": "EW Communication Services",
+    "sector": "XLC",
+    "holdings": ["META", "GOOGL", "GOOG", "NFLX", "DIS", "CMCSA", "T", "VZ", "CHTR", "TMUS", "EA", "ATVI", "TTWO", "WBD", "PARA", "OMC", "IPG", "FOXA", "MTCH", "LYV"]
+  },
+  "RSPM": {
+    "name": "EW Materials",
+    "sector": "XLB",
+    "holdings": ["LIN", "SHW", "APD", "ECL", "FCX", "NUE", "NEM", "DOW", "DD", "PPG", "VMC", "MLM", "CTVA", "IFF", "CE", "ALB", "EMN", "PKG", "IP", "AVY"]
+  },
+  "RSPR": {
+    "name": "EW Real Estate",
+    "sector": "XLRE",
+    "holdings": ["PLD", "AMT", "EQIX", "CCI", "PSA", "DLR", "O", "WELL", "SPG", "VICI", "AVB", "EQR", "IRM", "ARE", "SBAC", "MAA", "UDR", "EXR", "ESS", "INVH"]
+  },
+
+  "_comment_cw": "Cap-weighted SPDR sector ETFs — top 20 holdings by weight. Added 2025-02.",
+  "XLK": {
+    "name": "Technology",
+    "sector": "XLK",
+    "holdings": ["AAPL", "MSFT", "NVDA", "AVGO", "CRM", "AMD", "ADBE", "ACN", "CSCO", "ORCL", "INTU", "IBM", "NOW", "TXN", "QCOM", "AMAT", "ADI", "LRCX", "SNPS", "CDNS"]
+  },
+  "XLF": {
+    "name": "Financials",
+    "sector": "XLF",
+    "holdings": ["BRK.B", "JPM", "V", "MA", "BAC", "WFC", "GS", "MS", "SPGI", "BLK", "AXP", "C", "MMC", "CB", "PGR", "ICE", "CME", "AON", "SCHW", "MCO"]
+  },
+  "XLE": {
+    "name": "Energy",
+    "sector": "XLE",
+    "holdings": ["XOM", "CVX", "COP", "EOG", "SLB", "MPC", "PSX", "VLO", "OXY", "WMB", "HES", "HAL", "DVN", "FANG", "BKR", "KMI", "TRGP", "OKE", "CTRA", "MRO"]
+  },
+  "XLV": {
+    "name": "Health Care",
+    "sector": "XLV",
+    "holdings": ["LLY", "UNH", "JNJ", "MRK", "ABT", "TMO", "ABBV", "DHR", "AMGN", "PFE", "MDT", "BMY", "ISRG", "SYK", "GILD", "CI", "ELV", "VRTX", "BSX", "REGN"]
+  },
+  "XLI": {
+    "name": "Industrials",
+    "sector": "XLI",
+    "holdings": ["GE", "CAT", "RTX", "HON", "UNP", "BA", "DE", "UPS", "LMT", "ADP", "GD", "ITW", "NOC", "WM", "ETN", "FDX", "CSX", "PH", "EMR", "TDG"]
+  },
+  "XLP": {
+    "name": "Consumer Staples",
+    "sector": "XLP",
+    "holdings": ["PG", "PEP", "KO", "COST", "WMT", "PM", "MO", "MDLZ", "CL", "ADM", "GIS", "SYY", "KMB", "STZ", "HSY", "KHC", "KR", "MKC", "CHD", "TSN"]
+  },
+  "XLY": {
+    "name": "Consumer Discretionary",
+    "sector": "XLY",
+    "holdings": ["AMZN", "TSLA", "HD", "MCD", "NKE", "LOW", "SBUX", "TJX", "BKNG", "MAR", "ORLY", "AZO", "ROST", "DHI", "GM", "F", "LEN", "CMG", "YUM", "EBAY"]
+  },
+  "XLU": {
+    "name": "Utilities",
+    "sector": "XLU",
+    "holdings": ["NEE", "DUK", "SO", "D", "SRE", "AEP", "EXC", "XEL", "ED", "WEC", "ES", "PEG", "EIX", "AWK", "DTE", "ETR", "FE", "PPL", "AES", "CMS"]
+  },
+  "XLC": {
+    "name": "Communication Services",
+    "sector": "XLC",
+    "holdings": ["META", "GOOGL", "GOOG", "NFLX", "DIS", "CMCSA", "T", "VZ", "CHTR", "TMUS", "EA", "TTWO", "WBD", "PARA", "OMC", "IPG", "FOXA", "MTCH", "LYV", "NWSA"]
+  },
+  "XLB": {
+    "name": "Materials",
+    "sector": "XLB",
+    "holdings": ["LIN", "SHW", "APD", "ECL", "FCX", "NUE", "NEM", "DOW", "DD", "PPG", "VMC", "MLM", "CTVA", "IFF", "CE", "ALB", "EMN", "PKG", "IP", "AVY"]
+  },
+  "XLRE": {
+    "name": "Real Estate",
+    "sector": "XLRE",
+    "holdings": ["PLD", "AMT", "EQIX", "CCI", "PSA", "DLR", "O", "WELL", "SPG", "VICI", "AVB", "EQR", "IRM", "ARE", "SBAC", "MAA", "UDR", "EXR", "ESS", "INVH"]
+  }
+}
