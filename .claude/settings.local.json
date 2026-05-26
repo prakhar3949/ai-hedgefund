@@ -9,7 +9,16 @@
       "PowerShell(& \"D:\\\\Deepseek-ollama\\\\venv\\\\python.exe\" -c \"import yfinance; print\\('yfinance', yfinance.__version__\\)\")",
       "PowerShell(& \"D:\\\\Deepseek-ollama\\\\venv\\\\python.exe\" -m pip install --quiet yfinance)",
       "PowerShell(& \"D:\\\\Deepseek-ollama\\\\venv\\\\python.exe\" -c \"import yfinance as yf; print\\('yfinance', yf.__version__\\)\")",
-      "Bash(PYTHONIOENCODING=utf-8 python run-ticker.py AMZN)"
+      "Bash(PYTHONIOENCODING=utf-8 python run-ticker.py AMZN)",
+      "Bash(git commit -m ' *)",
+      "Bash(python volume-exhaustion-scanner.py NVDA TSLA PFE KRE COST)",
+      "Bash(python volume-exhaustion-scanner.py NVDA TSLA PFE KRE COST RDDT GME PFE TGT MTH ODFL)",
+      "Bash(python volume-exhaustion-scanner.py NVDA TSLA PFE KRE COST RDDT GME TGT MTH ODFL)",
+      "Bash(python volume-exhaustion-backtest.py)",
+      "Bash(python volume-exhaustion-scanner.py NVDA TSLA PFE COST RDDT GME)",
+      "Bash(python volume-exhaustion-scanner.py NVDA TSLA AAPL PFE)",
+      "Bash(python _test_oi_metrics.py)",
+      "Bash(python volume-exhaustion-scanner.py NVDA AAPL)"
     ]
   }
 }

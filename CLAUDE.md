@@ -63,6 +63,12 @@ d:\Deepseek-ollama\
 │   │   ├── bubble-backtest.py        ← single-date backtest harness for bubble-scanner (with per-entry diagnostics)
 │   │   ├── bubble-sweep.py           ← date-range sweep harness for bubble-scanner
 │   │   ├── gex-profile.py            ← SPX GEX profile (Perfiliev): nearest expiry + next OpEx, call/put walls (CBOE delayed JSON)
+│   │   ├── gex-profile-equity.py     ← Per-ticker GEX profile (any optionable US equity/ETF) — CBOE delayed JSON
+│   │   ├── volume-exhaustion-scanner.py ← Capitulation/Blowoff/Waning regime classifier (Wyckoff SC-AR-ST + Spring + multi-SC + OI %-change layer)
+│   │   ├── volume-exhaustion-backtest.py ← Historical validation harness (19 test events: GFC, COVID, dot-com, 1974 oil-shock, etc.)
+│   │   ├── oi-history.json           ← Daily OI snapshots per ticker (60d rolling window)
+│   │   ├── shares-outstanding-cache.json ← 7-day-TTL cache of Yahoo quoteSummary float counts
+│   │   ├── run-ticker.py             ← Per-ticker analysis runner (5 tools: fundamental-thesis + fundamentals-scanner + entry-analyzer + gex-profile-equity + volume-exhaustion-scanner)
 │   │   ├── pyramid-scanner.py        ← add-to-winners decision tool (reads pyramid-positions.json)
 │   │   ├── pyramid-positions.json    ← per-position state (entry, shares, adds, stop)
 │   │   ├── entry-analyzer.py         ← multi-timeframe entry candidate scoring (D/W/M, 30wk SMA, Fib swing, multi-AVWAP)
@@ -97,14 +103,15 @@ Current order:
 7. rrg-scanner.py (no yf)
 8. breadth-scanner.py (no yf)
 9. bubble-scanner.py (no yf)
-10. gex-profile.py (no yf)
-11. fx-models.py (yf)
-11. econ-predictor.py (no yf)
-12. sortino-optimizer.py (no yf)
-13. stock-discovery.py (no yf)
-14. fundamentals-scanner.py (no yf)
-15. early-trend-scanner.py (no yf)
-16. late-trend-scanner.py (no yf)
+10. volume-exhaustion-scanner.py (no yf)
+11. gex-profile.py (no yf)
+12. fx-models.py (yf)
+13. econ-predictor.py (no yf)
+14. sortino-optimizer.py (no yf)
+15. stock-discovery.py (no yf)
+16. fundamentals-scanner.py (no yf)
+17. early-trend-scanner.py (no yf)
+18. late-trend-scanner.py (no yf)
 
 ## Discord Webhooks
 Each script posts to its own Discord channel via webhook:
@@ -128,6 +135,8 @@ Each script posts to its own Discord channel via webhook:
 | fundamentals-scanner.py | `https://discord.com/api/webhooks/1475327530025222164/_IAvJ8JX2HWXRPDYER00UN5qj07DyoPNTZlk04TFV3SDrEaHcIxxe0-4J85LNgziGE39` |
 | bubble-scanner.py | `https://discord.com/api/webhooks/1504380703645761536/NrBply5IJF3F8h8BB8qANuB1-8lLsPp4xEz_zywcj5205cS0ZzMJNacAsdTj3029RduR` |
 | gex-profile.py | `https://discord.com/api/webhooks/1507392186222776422/HaApw51ljzILxhNqne8P5u_u5YwbSA5aF3qjQ1ieTtZatbx1MrooeLVzfOKg3OWtyNRr` |
+| gex-profile-equity.py | `https://discord.com/api/webhooks/1508366696212205660/WvjfoSkPzWNbIhNjL0R5eHFatKPzbCUDOTDqAslSgnPIa0N8-0sGLLaLoFMiSIBxsnjt` |
+| volume-exhaustion-scanner.py | `https://discord.com/api/webhooks/1508730602189488209/1OKp8ofZ3oN_8xUOfqgqNlIf7Nd26pdrB0_T8Y7HHRsmpM3E7ePApunw20JK6YD4h7IF` |
 
 ## Key Technical Patterns
 
@@ -482,6 +491,120 @@ Dual format — both `tickers` array and `stocks.holdings` dict:
     6. **OpEx picker selects a heavy LEAPS expiry** — Restricted to `today + [10, 45]` day window with max OI; LEAPS outside the window are ignored.
     7. **Strike range too wide → unreadable chart** — Clipped to `|GEX| ≥ 1% × max|GEX|` ∪ spot ± 5% band.
     8. **Discord 2000-char limit** — `send_discord_text` chunks at line boundaries before posting.
+
+28. **GEX Profile — Equity Edition (`gex-profile-equity.py`)** — Per-ticker fork of `gex-profile.py` for any optionable US equity/ETF.
+    - **Data**: same CBOE delayed-quotes endpoint, no underscore prefix for stocks: `https://cdn.cboe.com/api/global/delayed_quotes/options/{TICKER}.json`. Free, ~15-min delayed, no key. Works for SPY/QQQ (1000s of contracts) down to thin names like EXLS/G (~20-90 contracts).
+    - **CLI**: `python gex-profile-equity.py AAPL TSLA EXLS G` — one or more tickers. `$` prefix stripped automatically. `--min-oi N` overrides the OI floor.
+    - **Generalized symbol regex**: `^{ticker}[W]?(\d{2})(\d{2})(\d{2})([CP])(\d{8})$` built per ticker (escapes ticker for regex safety).
+    - **Spot fallback**: Yahoo chart API for `{ticker}` (not `^GSPC`) when CBOE payload lacks `current_price`.
+    - **Thin-chain auto-relax**: if `--min-oi 10` leaves < 15 contracts, auto-retry with `min_oi=1`. Lets thin names produce *some* profile rather than nothing.
+    - **Wider spot band**: clip keeps `|GEX| ≥ 1% × max` ∪ spot ± **20%** (vs SPX ±5%) — equity chains are sparser, narrow bands cut everything.
+    - **Strike formatting**: dynamic `.0f` for strikes ≥ $100, `.2f` for < $100, so $17.50 stays readable alongside $185.
+    - **0DTE block conditional**: only labeled "0DTE" when nearest expiry == today (rare for equities — most only have weekly Fridays). Otherwise labeled "NEAREST EXPIRY ONLY" to keep the panel meaningful.
+    - **OpEx panel skipped** when only one future expiry exists; renders single-panel chart instead of empty right panel.
+    - **Evolution chart skipped** when < 2 future expiries (would be a single dot).
+    - **Per-ticker loop in `main()`**: each ticker is independent — one failure doesn't halt the batch; errors caught, traceback to stderr, single error line posted to Discord, continue.
+    - **Discord webhook**: dedicated channel `1508366696212205660/WvjfoSkPzWNbIhNjL0R5eHFatKPzbCUDOTDqAslSgnPIa0N8-0sGLLaLoFMiSIBxsnjt` (separate from SPX gex channel so per-ticker streams don't drown out index profile).
+    - **NOT added to `run-all.py`** — on-demand per-ticker tool; invoked via `run-ticker.py` or directly.
+
+    **Worst-case stress test**:
+    1. **Ticker not optionable** (e.g. micro-cap, recently IPO'd) — CBOE returns empty `options[]`; script posts "no parseable contracts for {T}" and continues.
+    2. **Symbol prefix collision** (e.g. ticker `SPX` matching SPX index format) — regex anchors on `^{ticker}` exactly via `re.escape`, no collision.
+    3. **All contracts below OI=10** — thin-chain fallback re-parses at OI=1; if still empty, posts "no parseable contracts" and continues.
+    4. **Only one future expiry** — OpEx panel skipped, single-panel chart rendered with same legend.
+    5. **CBOE spot missing/zero** — Yahoo `{ticker}` fallback. If both fail, raises clean exception caught by per-ticker error handler.
+    6. **Strike < $1** (e.g. penny biotechs) — `.2f` formatter still renders; bar width logic uses `max(..., 0.5)` floor so bars don't vanish.
+    7. **Discord webhook rate-limit on multi-ticker batch** — per-ticker posts go through `send_discord_text/image` which has 30s/60s timeouts; failures logged to stderr, batch continues.
+
+29. **Share Buyback section in `fundamental-thesis.py`** — Capital-return analysis (Damodaran total-shareholder-yield framework).
+    - **New extractor `extract_buybacks(qs, m)`** pulls quarterly + annual cashflow data; computes:
+      - **Buybacks TTM** = sum of last 4Q `repurchaseOfStock` (sign-flipped to positive $ spent). Falls back to `commonStockRepurchased` if primary field is missing/null.
+      - **Issuance TTM** = sum of last 4Q `issuanceOfStock` (positive cash inflow).
+      - **Net buyback TTM** = buybacks − issuance (catches net-issuers masquerading as buyback companies).
+      - **SBC-adjusted buyback** = buybacks − SBC TTM (the *real* per-share accretion; if SBC > buybacks, this goes negative).
+      - **Buyback yield %** = buyback / market cap × 100.
+      - **Net buyback yield %** = net_buyback / market cap × 100 (can be negative for net dilution).
+      - **SBC-adj yield %** = SBC-adjusted / market cap (negative when SBC outpaces repo).
+      - **Total shareholder yield %** = buyback yield + div yield (Damodaran).
+      - **Consistency** = count of last 4 quarters that had any buyback.
+      - **Annual YoY trend** = (annual_repo[0] / annual_repo[1] − 1) × 100, when 2+ annual statements available.
+    - **Rendered as new "── CAPITAL RETURN — BUYBACKS & DIVIDENDS ──" section** in `render_report`, placed between BALANCE SHEET and the sector pack. Shows TTM dollars + 3 yield variants + consistency + annual history.
+    - **Bull/bear thesis signals added in `build_thesis`**:
+      - **Bull**: net buyback yield ≥ 5% ("aggressive shareholder return"); total shareholder yield ≥ 8% ("high cash return").
+      - **Bear**: net buyback yield ≤ −3% ("net dilution"); SBC-adj yield < −2% when gross buybacks are non-zero ("buybacks fail to offset SBC dilution" — the Druckenmiller/Scion concern).
+    - **Wiring**: `extract_buybacks` called in `process_ticker` after `extract_quarterly`; passed to `build_thesis` and `render_report` as keyword arg `buybacks=` so callers without the data don't break.
+
+    **Worst-case stress test**:
+    1. **Yahoo returns no cashflow** — extractor returns dict with `None`/`0` values; render shows "No cashflow data available" or "n/a" for individual yields. No crash.
+    2. **`repurchaseOfStock` missing, `commonStockRepurchased` present** — extractor checks the alternate field name when the primary returns all-None.
+    3. **Net issuer (issuance > repo TTM)** — net buyback yield goes negative; bear flag fires at ≤ −3%; rendered with `+`/`−` sign so direction is clear.
+    4. **Missing/zero market cap** (rare; new IPOs without market cap reported) — yield calcs return `None`; rendered as "n/a" rather than ZeroDivisionError.
+    5. **< 4 quarters of cashflow data** — `cf_q[:4]` slice handles short lists; consistency reports `0-3/4` honestly.
+    6. **No annual cashflow available** — `annual_yoy_pct` is `None`; annual history line is suppressed.
+    7. **SBC TTM > Buybacks TTM** — `sbc_adj_buyback_ttm` goes negative; surfaces as a bear flag rather than being silently positive; the "(SBC TTM: ... — subtract from gross buybacks)" note in the report makes the drag explicit.
+
+30. **Ticker Analysis Runner (`run-ticker.py`)** — One-shot runner for all per-ticker tools.
+    - **Purpose**: run the five ticker-specific tools on the same list of tickers in one command. Mirrors `run-all.py` but for ticker-scoped (vs market-scoped) analysis.
+    - **Scripts invoked sequentially**:
+      1. `fundamental-thesis.py` — per-ticker thesis with sector pack, bull/bear, buybacks
+      2. `fundamentals-scanner.py` — quality + valuation overlay (cohort scoring)
+      3. `entry-analyzer.py` — multi-timeframe entry scoring (PRIME/GOOD/MIXED/AVOID + first-phase plan)
+      4. `gex-profile-equity.py` — per-ticker GEX profile (CBOE delayed options chain)
+      5. `volume-exhaustion-scanner.py` — Capitulation/Blowoff/Waning regime classifier + OI %-change layer
+    - **CLI**: `python run-ticker.py EXLS G` or `python run-ticker.py $AAPL $TSLA` — `$` prefix stripped, uppercased, dedup-on-the-fly.
+    - **Each subprocess gets `PYTHONIOENCODING=utf-8` injected** to prevent Windows cp1252 crashes on unicode arrows/checkmarks in tool output (we hit this earlier with fundamentals-scanner's `→`).
+    - **Per-script timeout 300s**, captured output (last 8 lines on success, last 8 lines of stderr on failure printed for diagnostics).
+    - **Per-script independence**: one failure doesn't halt the run; runner reports `OK`/`FAIL`/`TIMEOUT`/`SKIP` per script and a final tally.
+    - **Output**: posts to each tool's existing Discord webhook (4 separate channels). Local stdout shows progress + tail of each tool's output.
+    - **NOT added to `run-all.py`** — ticker-scoped on-demand tool; runs when you want to drill into specific names.
+
+    **Worst-case stress test**:
+    1. **Ticker not optionable** (e.g. illiquid micro-cap) — `gex-profile-equity` fails or skips; other 3 tools succeed. Runner reports `FAIL GEX Profile` but exits non-zero only on the GEX line, batch continues.
+    2. **cp1252 encoding crash on unicode output** — `PYTHONIOENCODING=utf-8` in subprocess env; `subprocess.run(..., encoding="utf-8", errors="replace")` on capture too.
+    3. **One script hangs** (e.g. SEC EDGAR rate-limit) — 300s timeout kills it; reported as `TIMEOUT`; next script still runs.
+    4. **`$AAPL` style input** — `lstrip("$").upper().strip()` normalization before forwarding.
+    5. **Network flake mid-batch** — captured `result.stderr`, last 8 lines surfaced; runner continues.
+    6. **Script missing from tools/** — `script_path.exists()` check; logs `SKIP` and moves on (lets the runner survive partial installs).
+    7. **No tickers passed** — prints usage and `sys.exit(1)` immediately; doesn't run any subprocesses.
+
+31. **Volume Exhaustion Scanner (`volume-exhaustion-scanner.py`)** — Capitulation / Blowoff / Waning regime classifier with Wyckoff SC→AR→ST sequence + Spring detector + multi-SC tracking + Open Interest %-change layer. Classical volume analysis (Wyckoff, VSA, O'Neil, Granville, Lo & Wang turnover) operationalized as a three-regime tape-reader.
+    - **Universe modes**:
+      - No CLI args → daily scan: `watchlist.json ∪ discovery-output.json` (drops ETFs, caps at 100)
+      - CLI args (with or without `$` prefix) → scan only those tickers (used by `run-ticker.py`)
+    - **Module 1 — Regime classifier** (per ticker): `DOWNTREND` (drawdown ≥20% from 1y high AND < SMA200), `EXTENDED_UPTREND` (close > 1.30× SMA200 OR > SMA200 + 2σ OR +50% in 60d), `STEADY_UPTREND` (above SMA200, SMA50 > SMA200, not extended), `CHOP` else. Each regime gates which signals are eligible.
+    - **Module 2 — Volume swell detection**: spike if vol ≥ 1.5× **180-day median** baseline (median is robust to crash-period contamination that breaks rolling means) OR ≥ 90th-pct of trailing 60d. Wide-range bar if range ≥ 1.5× ATR(14). Reversal candle: hammer / engulfing / "close in upper half" (bullish) or shooting-star / engulfing / parabolic-close / "close in lower half" (bearish) — looser than textbook hammer/engulfing to catch real index climactic bars like SPY Oct 10 2008 and Mar 23 2020 (which had large bodies, not the strict 2:1 lower-shadow-to-body ratio).
+    - **Module 3 — Turnover (Lo & Wang)**: volume / `sharesOutstanding`, percentile-ranked over 60d, 10-day regression slope. `sharesOutstanding` cached 7 days in `shares-outstanding-cache.json` (float doesn't move daily).
+    - **Module 4 — Waning rally** (Granville / VSA "no demand on rally"): c1 price up ≥5% in 30d, c2 vol slope < 0, c3 up/dn ratio deteriorating last-10 vs prior-10, c4 CMF-20 slope < 0. Tiered: c1+c2 (core 2/4) → WATCH; c1+c2 + (c3 OR c4) → WARNING. Fires in STEADY_UPTREND or EXTENDED_UPTREND (pre-blowoff distribution often happens during parabolic phases too).
+    - **Module 5 — Wyckoff SC → AR → ST sequence**: scans the trailing **180 sessions** for ALL SC candidates (was 30; widened so late-bear bottoms can reference the original SC months earlier), evaluates each independently, picks the best-staged one. AR window is market-cap aware: **5 sessions for non-mega-cap** (cap < $500B), **10 sessions for mega-cap** (cap ≥ $500B). ST window is **universal 30 sessions for all caps**. Confidence tiers:
+      - `CAPITULATION_BOTTOM_CONFIRMED` — SC + AR + ST present
+      - `CAPITULATION_BOTTOM_FORMING` — SC + AR present
+      - `CAPITULATION_WATCH` — SC only
+      - `CAPITULATION_FAILED` — close < SC_low after AR (failed structure)
+      - **Spring detector** (`detect_spring`) — break of 60-session support → reversal back above with ≥5% bounce. When any SC has FAILED but a Spring is currently forming below the failed-SC low, upgrades the signal to `CAPITULATION_BOTTOM_FORMING` with `pattern: SPRING_AFTER_FAILED`. This is the key Stage 2 addition that catches Mar-2009-style bottoms where the original SC happened in Oct 2008 but the actual low formed 5 months later on lighter volume.
+    - **Module 6 — Open Interest %-change layer (the user's explicit ask)**: per-ticker CBOE delayed JSON (`https://cdn.cboe.com/api/global/delayed_quotes/options/{TICKER}.json`, same source as `gex-profile-equity.py`). Aggregates total call OI, put OI, put/call OI ratio, top-5 strikes per side. Persists daily snapshots to `oi-history.json` (60d rolling, deduped by date for re-run idempotency). Metrics computed from history: 1d/5d/20d % change in total OI, side-split (call vs put) 5d % change, P/C ratio delta vs 20d avg, derived flags (INCREASING / DECREASING / FLAT at ±10%, `call_oi_surge` and `put_oi_surge` at +25% 5d). **Annotation only — never auto-upgrades signal confidence for any ticker (mega-cap or not).** Shows as a second-line tag in each signal row: `OI: increasing (+12% 5d, 7 snap)  PUT_SURGE +X% 5d (panic hedging)` etc. Graceful: `NO_OPTIONS_DATA` flag when CBOE returns no chain.
+    - **Module 7 — Composite signal**: 7 named signals across 3 regimes, plus `NEUTRAL` (suppressed from output). 4 stress-test flags (`MEGA_CAP`, `MECHANICAL_FLOW`, `SPLIT_SUSPECT`, `BROAD_FLOW`, `NO_OPTIONS_DATA`) annotate but don't promote/demote tier.
+    - **Output**: Discord post with 3 sections (CAPITULATION / BLOWOFF / WANING), per-ticker dark-theme chart with Wyckoff annotations (SC star, AR diamond, ST square, Spring plus-marker, FAILED X-mark, SC_low horizontal line). Top 5 charts per category.
+    - **Backtest harness** (`volume-exhaustion-backtest.py`): runs the full pipeline "as of" historical dates by truncating Yahoo's full-history pull (using `period1=0&period2=now` for true max history). 19 test cases across GFC, COVID, dot-com, 1974 oil-shock (IBM since ^GSPC volume only goes back to 1985), 9/11 panic, WMT 2015 drawdown, dot-com peaks. Validated at **17/19 = 89% pass rate**.
+    - **Stage 1 → Stage 2 calibration journey**:
+      - Stage 1 used textbook strict thresholds (vol ≥ 2.5× 20d avg, range ≥ 2× ATR, strict hammer/engulfing geometry, 30d SC lookback). Resulted in 4/19 pass — most failures were "real climactic bars didn't fit textbook patterns" (SPY Oct 10 2008 was a +5.9% green bar but body was large, not a hammer; SPY Mar 23 2020 had vol 1.87× 20d avg because crash days had already inflated the baseline).
+      - Stage 2 fixes: 1.5× threshold on a 180d-median baseline (robust to inflation), 1.5× ATR for wide range, looser reversal (upper-half-close OR hammer OR engulfing for bullish; symmetric for bearish), widened SC lookback 30→180, multi-SC tracking with best-stage-wins selection, Spring fallback pattern, market-cap-aware AR window. Result: 17/19 pass.
+    - **Discord webhook**: `1508730602189488209/1OKp8ofZ3oN_8xUOfqgqNlIf7Nd26pdrB0_T8Y7HHRsmpM3E7ePApunw20JK6YD4h7IF`.
+    - **Added to `run-all.py` as script #10** (after `bubble-scanner.py`, before `gex-profile.py`). No yf cooldown.
+    - **Added to `run-ticker.py` as 5th tool** alongside `gex-profile-equity.py` (both CBOE-based per-ticker tools).
+
+    **Worst-case stress test** (8 scenarios considered before coding, mitigations implemented):
+    1. **Low-VIX bull tape may generate spurious WANING signals.** User decision: **do NOT include a VIX suppression gate in v1.** Observe forward returns first; the four-condition AND (and the new 2/4 c1+c2 mandatory tier for WATCH) is already restrictive. Revisit if forward-return analysis shows noise.
+    2. **Single SC candle marked as bottom prematurely; price keeps dropping** (the classic "failed first SC" problem). *Mitigation*: tiered confidence with market-cap-aware AR window (5d non-mega / 10d mega) but **universal 30-session ST window for all caps**. Single SC = WATCH only; needs AR within window for FORMING; needs ST within 30 for CONFIRMED; close < SC_low → FAILED.
+    3. **Mega-cap options OI dominated by institutional hedging — OI surge reflects macro hedge funds rolling protection, not retail FOMO.** *Mitigation*: per user, **OI never auto-upgrades signal confidence for ANY ticker**. The `oi_pct_change_*` metrics display as informational context but tier promotion comes only from price/volume structure. Mega-caps get a `MEGA_CAP` tag so user can interpret OI context accordingly.
+    4. **Small-cap or recently-listed name with no options chain.** *Mitigation*: graceful `NO_OPTIONS_DATA` flag. Signal still emits on equity-volume + turnover alone.
+    5. **Stock split mid-window inflates/deflates volume series.** *Mitigation*: Yahoo chart API returns split-adjusted volume by default. Day-over-day vol ratio ≥ 5× without commensurate range expansion → `SPLIT_SUSPECT` flag, skip classification.
+    6. **Index reconstitution day creates mechanical volume surge.** *Mitigation*: hardcoded Russell/S&P quarterly rebal dates; spike day within ±2 sessions → `MECHANICAL_FLOW` flag, suppress signal.
+    7. **Wyckoff Failed ST: SC + AR completes, then price breaks SC_low.** *Mitigation*: explicit `CAPITULATION_FAILED` state; once price closes below SC_low after AR, signal flips from "potential bottom" to "trend continuation confirmed, avoid".
+    8. **Idiosyncratic vs broad-market move not distinguished.** *Mitigation*: `idiosyncratic_score = ticker_vol_zscore - SPY_vol_zscore` on the candidate SC day; require ≥ 1.0 for SC to count. Broad de-risking days get `BROAD_FLOW` tag and don't trigger capitulation signals.
+
+    **Known limitations (2 pattern gaps from backtest)**:
+    - **Parabolic blowoff with rising volume** (e.g. ^IXIC Feb-Mar 2000) — the scanner detects waning (vol declining) but parabolic tops show vol *rising* into the peak (FOMO buying). Distinct pattern that needs a separate detector (extended uptrend + 30d gain very high + rising vol + distribution candles). Out of scope for v2.
+    - **Downside thrust in established downtrend** (e.g. ^IXIC Apr 14 2000, -9.67% panic continuation) — wide-range bearish bar in DOWNTREND with huge vol but no reversal candle. Real pattern (trend acceleration) but doesn't fit the three-regime taxonomy. Would need a `DOWNSIDE_THRUST` warning tier.
 
 ## CI/CD — GitHub Actions
 Automated daily run via GitHub Actions. Workflow file: `.github/workflows/finance-tools.yml`

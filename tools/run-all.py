@@ -27,6 +27,7 @@ SCRIPTS = [
     ("rrg-scanner.py",           "RRG Scanner",           False),
     ("breadth-scanner.py",       "Market Breadth",        False),
     ("bubble-scanner.py",        "Bubble Scanner",         False),
+    ("volume-exhaustion-scanner.py", "Volume Exhaustion Scanner", False),
     ("gex-profile.py",           "GEX Profile",            False),
     ("fx-models.py",             "FX Models",             True),
     ("econ-predictor.py",        "Econ Predictor",        False),

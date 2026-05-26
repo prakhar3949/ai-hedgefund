@@ -1,0 +1,42 @@
+{
+  "NVDA": {
+    "shares_outstanding": 24221000000,
+    "fetched_at": "2026-05-26"
+  },
+  "TSLA": {
+    "shares_outstanding": 3755723871,
+    "fetched_at": "2026-05-26"
+  },
+  "PFE": {
+    "shares_outstanding": 5699444169,
+    "fetched_at": "2026-05-26"
+  },
+  "COST": {
+    "shares_outstanding": 443652540,
+    "fetched_at": "2026-05-26"
+  },
+  "RDDT": {
+    "shares_outstanding": 141965642,
+    "fetched_at": "2026-05-26"
+  },
+  "GME": {
+    "shares_outstanding": 448691227,
+    "fetched_at": "2026-05-26"
+  },
+  "TGT": {
+    "shares_outstanding": 454177135,
+    "fetched_at": "2026-05-26"
+  },
+  "MTH": {
+    "shares_outstanding": 66702433,
+    "fetched_at": "2026-05-26"
+  },
+  "ODFL": {
+    "shares_outstanding": 207968283,
+    "fetched_at": "2026-05-26"
+  },
+  "AAPL": {
+    "shares_outstanding": 14687356000,
+    "fetched_at": "2026-05-26"
+  }
+}

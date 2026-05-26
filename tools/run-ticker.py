@@ -2,10 +2,11 @@
 Run Ticker-Specific Analysis
 
 Runs all per-ticker analysis tools on one or more tickers sequentially:
-  1. fundamental-thesis.py    — per-ticker fundamental thesis (sector pack, bull/bear, buybacks)
-  2. fundamentals-scanner.py  — quality + valuation overlay (cohort scoring)
-  3. entry-analyzer.py        — multi-timeframe entry scoring (PRIME/GOOD/MIXED/AVOID + first-phase plan)
-  4. gex-profile-equity.py    — per-ticker GEX profile (CBOE delayed options chain)
+  1. fundamental-thesis.py         — per-ticker fundamental thesis (sector pack, bull/bear, buybacks)
+  2. fundamentals-scanner.py       — quality + valuation overlay (cohort scoring)
+  3. entry-analyzer.py             — multi-timeframe entry scoring (PRIME/GOOD/MIXED/AVOID + first-phase plan)
+  4. gex-profile-equity.py         — per-ticker GEX profile (CBOE delayed options chain)
+  5. volume-exhaustion-scanner.py  — capitulation / blowoff / waning regime classifier + OI layer
 
 Each tool posts to its own Discord webhook. Tickers can be passed with or without
 the leading `$` (e.g. `EXLS` or `$EXLS`).
@@ -28,10 +29,11 @@ TOOLS_DIR = Path(__file__).resolve().parent
 
 # (filename, human label, timeout_seconds)
 SCRIPTS = [
-    ("fundamental-thesis.py",   "Fundamental Thesis",     300),
-    ("fundamentals-scanner.py", "Fundamentals Scanner",   300),
-    ("entry-analyzer.py",       "Entry Analyzer",         300),
-    ("gex-profile-equity.py",   "GEX Profile (Equity)",   300),
+    ("fundamental-thesis.py",        "Fundamental Thesis",     300),
+    ("fundamentals-scanner.py",      "Fundamentals Scanner",   300),
+    ("entry-analyzer.py",            "Entry Analyzer",         300),
+    ("gex-profile-equity.py",        "GEX Profile (Equity)",   300),
+    ("volume-exhaustion-scanner.py", "Volume Exhaustion",      300),
 ]
 
 
