@@ -38,5 +38,37 @@
   "AAPL": {
     "shares_outstanding": 14687356000,
     "fetched_at": "2026-05-26"
+  },
+  "KE": {
+    "shares_outstanding": 24048925,
+    "fetched_at": "2026-05-27"
+  },
+  "GTLB": {
+    "shares_outstanding": 152478438,
+    "fetched_at": "2026-05-27"
+  },
+  "AVAV": {
+    "shares_outstanding": 50605071,
+    "fetched_at": "2026-05-27"
+  },
+  "SWKS": {
+    "shares_outstanding": 150405963,
+    "fetched_at": "2026-05-27"
+  },
+  "ANF": {
+    "shares_outstanding": 44738525,
+    "fetched_at": "2026-05-28"
+  },
+  "IBM": {
+    "shares_outstanding": 939885280,
+    "fetched_at": "2026-05-28"
+  },
+  "VEEV": {
+    "shares_outstanding": 163198698,
+    "fetched_at": "2026-06-01"
+  },
+  "A": {
+    "shares_outstanding": 282218158,
+    "fetched_at": "2026-06-01"
   }
 }

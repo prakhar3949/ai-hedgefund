@@ -24,6 +24,7 @@ import sys
 import requests
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -38,6 +39,11 @@ DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1507392186222776422/HaAp
 
 CBOE_URL = "https://cdn.cboe.com/api/global/delayed_quotes/options/_SPX.json"
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+# Structural named levels (Call Resistance / Put Support / HVL / GEX 1-5) are computed on
+# the near-dated window only. The full chain lets far-OTM round-strike LEAPS OI (e.g. 7000
+# puts) hijack the put-support level; restricting to <=45 DTE reproduces MenthorQ's levels.
+NEAR_TERM_DTE = 45
 
 # SPX option symbol: e.g. "SPXW260613C07450000" or "SPX260618P07000000"
 SYMBOL_RE = re.compile(r"^SPX[W]?(\d{2})(\d{2})(\d{2})([CP])(\d{8})$")
@@ -128,12 +134,14 @@ def parse_chain(payload: dict) -> tuple[float, pd.DataFrame]:
             continue
         if oi < 10 or gamma <= 0:
             continue
+        iv = opt.get("iv")
         rows.append({
             "expiry": exp,
             "strike": strike,
             "type": cp,
             "oi": float(oi),
             "gamma": float(gamma),
+            "iv": float(iv) if iv is not None else float("nan"),
         })
     df = pd.DataFrame(rows)
     return float(spot), df
@@ -183,12 +191,12 @@ def aggregate_strikes(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
     return calls.sort_index(), puts.sort_index()
 
 
-def compute_named_levels(df: pd.DataFrame, near_df: pd.DataFrame) -> dict:
+def compute_named_levels(df: pd.DataFrame, near_df: pd.DataFrame, spot: float) -> dict:
     """MenthorQ-style level taxonomy from the GEX chain.
 
-    Full-chain: Call Resistance, Put Support, HVL (Zero Gamma).
-    0DTE-only:  Call Resistance 0DTE / Gamma Wall 0DTE, Put Support 0DTE, HVL 0DTE.
-    GEX 1-5:    Top 5 strikes by |net GEX| across the full chain.
+    Near-term: Call Resistance, Put Support, HVL (Zero Gamma).
+    0DTE-only: Call Resistance 0DTE / Gamma Wall 0DTE, Put Support 0DTE, HVL 0DTE.
+    GEX 1-5:   Top 5 gross-gamma walls within spot +/-2%.
     """
     def _levels(sub: pd.DataFrame) -> dict:
         calls = sub[sub["type"] == "C"].groupby("strike")["gex"].sum()
@@ -197,21 +205,62 @@ def compute_named_levels(df: pd.DataFrame, near_df: pd.DataFrame) -> dict:
         net = pd.Series(
             {k: float(calls.get(k, 0.0)) + float(puts.get(k, 0.0)) for k in all_s}
         ).sort_index()
-        zgl, _ = zero_gamma_flip(calls, puts)
+        # Gross gamma per strike: |call_gex| + |put_gex|. This is the true magnitude of
+        # gamma sitting at the strike. Net (call - put) cancellation hides the dominant
+        # wall — e.g. 7600 has +11.8B call / -7.8B put = only +4B net but ~19.4B gross,
+        # which is why MenthorQ flags 7600 as the primary GEX level, not a net-ranked strike.
+        gross = pd.Series(
+            {k: abs(float(calls.get(k, 0.0))) + abs(float(puts.get(k, 0.0))) for k in all_s}
+        ).sort_index()
+        zgl, _ = gamma_flip_bs(sub, spot)
+        # Call Resistance is a CEILING (premium sold heaviest -> slowdowns), so it must
+        # sit at/above spot; Put Support is a FLOOR (premium bought heaviest -> support
+        # shelf), so it must sit at/below spot. Without the side constraint the heaviest
+        # call/put gamma can land on the wrong side of spot and mislabel a level (e.g.
+        # "Put Support" printing above spot, which is not a support shelf at all).
+        calls_res = calls[calls.index >= spot]
+        puts_sup = puts[puts.index <= spot]
+        has_cr = not calls_res.empty and calls_res.max() > 0
+        has_ps = not puts_sup.empty and puts_sup.min() < 0
         return {
-            "call_wall": float(calls.idxmax()) if not calls.empty and calls.max() > 0 else None,
-            "call_wall_v": float(calls.max()) if not calls.empty else 0.0,
-            "put_wall": float(puts.idxmin()) if not puts.empty and puts.min() < 0 else None,
-            "put_wall_v": float(abs(puts.min())) if not puts.empty else 0.0,
+            "call_wall": float(calls_res.idxmax()) if has_cr else None,
+            "call_wall_v": float(calls_res.max()) if has_cr else 0.0,
+            "put_wall": float(puts_sup.idxmin()) if has_ps else None,
+            "put_wall_v": float(abs(puts_sup.min())) if has_ps else 0.0,
             "zgl": zgl,
             "net": net,
+            "gross": gross,
         }
 
     full = _levels(df)
     zerod = _levels(near_df) if not near_df.empty else None
-    top5_idx = full["net"].abs().sort_values(ascending=False).head(5).index
-    top5 = [(float(k), float(full["net"].loc[k])) for k in top5_idx]
+    # GEX 1-5: largest gross gamma walls near spot (spot +/-2%). Ranking by gross (not net)
+    # so the dominant wall surfaces as GEX 1; band keeps far round-strike OI (e.g. 7000) out.
+    band = full["gross"][(full["gross"].index >= spot * 0.98) & (full["gross"].index <= spot * 1.02)]
+    if band.empty:
+        band = full["gross"]
+    top5_idx = band.sort_values(ascending=False).head(5).index
+    top5 = [(float(k), float(full["net"].loc[k]), float(full["gross"].loc[k])) for k in top5_idx]
     return {"full": full, "zerod": zerod, "gex_top5": top5}
+
+
+def compute_expected_move(df: pd.DataFrame, spot: float, nearest: date) -> tuple[float, float, float] | None:
+    """1-day expected move from ATM IV of the nearest expiry (MenthorQ 1D Max / 1D Min).
+
+    move = spot * atm_iv * sqrt(1/252).  Returns (hi, lo, atm_iv) or None if no IV data.
+    """
+    if "iv" not in df.columns:
+        return None
+    sub = df[df["expiry"] == nearest].dropna(subset=["iv"])
+    sub = sub[sub["iv"] > 0]
+    if sub.empty:
+        return None
+    atm_strike = sub.loc[(sub["strike"] - spot).abs().idxmin(), "strike"]
+    atm_iv = float(sub[sub["strike"] == atm_strike]["iv"].mean())
+    if not (atm_iv > 0):
+        return None
+    move = spot * atm_iv * np.sqrt(1.0 / 252.0)
+    return (spot + move, spot - move, atm_iv)
 
 
 def clip_strike_range(calls: pd.Series, puts: pd.Series, spot: float):
@@ -285,11 +334,93 @@ def render_panel(ax, calls: pd.Series, puts: pd.Series, spot: float, title: str,
     ax.grid(axis="y", alpha=0.15, color="white")
 
 
-def zero_gamma_flip(calls: pd.Series, puts: pd.Series) -> tuple[float, float]:
-    """Compute the per-expiry Zero-Gamma Level (ZGL) — Perfiliev / SqueezeMetrics canonical.
+def add_dte(df: pd.DataFrame, today: date) -> pd.DataFrame:
+    """Add business-days-to-expiry in years (T). 0DTE floored at 1/262 so it isn't
+    excluded by the Black-Scholes gamma (Perfiliev convention)."""
+    df = df.copy()
+    bd = np.array([np.busday_count(today, e) for e in df["expiry"]], dtype=float)
+    bd[bd <= 0] = 1.0
+    df["T"] = bd / 262.0
+    return df
 
-    Walk strikes low → high, accumulate net GEX. The flip is where cumulative crosses zero.
-    Below the flip dealers are net short gamma (vol expansion); above, net long gamma (pinning).
+
+def _bs_gamma(S: float, K, iv, T):
+    """Black-Scholes gamma (identical for calls and puts), r = q = 0.
+    Vectorized over arrays K, iv, T at a single scalar spot S."""
+    K = np.asarray(K, dtype=float)
+    iv = np.asarray(iv, dtype=float)
+    T = np.asarray(T, dtype=float)
+    out = np.zeros_like(K)
+    ok = (iv > 0) & (T > 0) & (S > 0) & (K > 0)
+    if not ok.any():
+        return out
+    d1 = (np.log(S / K[ok]) + 0.5 * iv[ok] ** 2 * T[ok]) / (iv[ok] * np.sqrt(T[ok]))
+    out[ok] = norm.pdf(d1) / (S * iv[ok] * np.sqrt(T[ok]))
+    return out
+
+
+def gamma_flip_bs(sub: pd.DataFrame, spot: float, n: int = 60) -> tuple[float, float]:
+    """Perfiliev re-priced Gamma Flip (HVL) — the canonical SqueezeMetrics method.
+
+    Holds OI fixed and RE-PRICES gamma via Black-Scholes at n spot levels across
+    [0.8, 1.2]*spot, sums the signed dealer gamma profile (call gamma − put gamma),
+    and returns the zero-crossing strike. This is materially more accurate than
+    accumulating static snapshot gamma across strikes (see gamma-profile.py
+    comparison: the static proxy mislocated HVL by 180–325 pts).
+
+    `sub` needs per-contract columns: strike, type ('C'/'P'), iv, T (years), oi.
+    Returns (flip_strike | nan, peak_|profile| as magnitude in $).
+    """
+    if sub is None or sub.empty or "iv" not in sub.columns or "T" not in sub.columns:
+        return (float("nan"), 0.0)
+    c = sub[sub["type"] == "C"].dropna(subset=["iv", "T"])
+    p = sub[sub["type"] == "P"].dropna(subset=["iv", "T"])
+    c = c[c["iv"] > 0]
+    p = p[p["iv"] > 0]
+    if c.empty or p.empty:
+        return (float("nan"), 0.0)
+    ck, civ, cT, coi = (c[x].to_numpy() for x in ("strike", "iv", "T", "oi"))
+    pk, piv, pT, poi = (p[x].to_numpy() for x in ("strike", "iv", "T", "oi"))
+
+    levels = np.linspace(0.8 * spot, 1.2 * spot, n)
+    prof = np.empty(n)
+    for i, S in enumerate(levels):
+        cgex = (coi * 100.0 * S * S * 0.01 * _bs_gamma(S, ck, civ, cT)).sum()
+        pgex = (poi * 100.0 * S * S * 0.01 * _bs_gamma(S, pk, piv, pT)).sum()
+        prof[i] = cgex - pgex
+    mag = float(np.abs(prof).max())
+    if mag <= 0:
+        return (float("nan"), 0.0)
+
+    idx = np.where(np.diff(np.sign(prof)))[0]
+    if len(idx) == 0:
+        return (float("nan"), mag)
+    # Reject spurious edge crossings: for short-dated expiries the profile underflows
+    # to ~0 far from spot, so tiny sign flicker at the edges creates fake crossings
+    # (e.g. a flip printed at 0.82*spot). Require meaningful profile magnitude on at
+    # least one side, then pick the crossing nearest spot (the real dealer flip).
+    thresh = 0.02 * mag
+    cands = [j for j in idx if max(abs(prof[j]), abs(prof[j + 1])) >= thresh] or list(idx)
+    best = None
+    for j in cands:
+        neg, pos = prof[j], prof[j + 1]
+        if pos == neg:
+            continue
+        ks, kp = levels[j], levels[j + 1]
+        f = kp - (kp - ks) * pos / (pos - neg)
+        if best is None or abs(f - spot) < abs(best - spot):
+            best = f
+    return (float(best), mag) if best is not None else (float("nan"), mag)
+
+
+def zero_gamma_flip(calls: pd.Series, puts: pd.Series) -> tuple[float, float]:
+    """LEGACY static-gamma ZGL proxy — superseded by gamma_flip_bs() in production.
+
+    Walks strikes low → high accumulating static net GEX and returns the cumulative
+    zero-cross. Retained only so gamma-profile.py can show the legacy-vs-BS delta;
+    NOT used by the main GEX run anymore (it mislocates the flip by 180–325 pts
+    because static snapshot gamma at far strikes does not reflect the gamma those
+    strikes would carry at the candidate spot).
     Returns (flip_strike, peak_|cumulative| as magnitude).
     """
     all_strikes = sorted(set(calls.index) | set(puts.index))
@@ -316,8 +447,8 @@ def zero_gamma_flip(calls: pd.Series, puts: pd.Series) -> tuple[float, float]:
     return (float(strikes[-1]), mag)
 
 
-def per_expiry_key_strikes(df: pd.DataFrame, expiries: list[date]) -> pd.DataFrame:
-    """For each expiry: max call wall, max put wall, and Zero-Gamma Level (ZGL)."""
+def per_expiry_key_strikes(df: pd.DataFrame, expiries: list[date], spot: float) -> pd.DataFrame:
+    """For each expiry: max call wall, max put wall, and Zero-Gamma Level (ZGL / BS flip)."""
     rows = []
     for exp in expiries:
         sub = df[df["expiry"] == exp]
@@ -328,7 +459,7 @@ def per_expiry_key_strikes(df: pd.DataFrame, expiries: list[date]) -> pd.DataFra
 
         max_call = (float(calls.idxmax()), float(calls.max())) if not calls.empty and calls.max() > 0 else (np.nan, 0.0)
         max_put = (float(puts.idxmin()), float(abs(puts.min()))) if not puts.empty and puts.min() < 0 else (np.nan, 0.0)
-        zgl_strike, zgl_mag = zero_gamma_flip(calls, puts)
+        zgl_strike, zgl_mag = gamma_flip_bs(sub, spot)
 
         rows.append({
             "expiry": exp,
@@ -396,6 +527,88 @@ def render_evolution(key: pd.DataFrame, spot: float) -> io.BytesIO:
     return buf
 
 
+def render_levels_map(spot: float, levels: dict, em: tuple | None, today: date) -> io.BytesIO:
+    """MenthorQ-style level map: horizontal lines on a price axis with labels.
+
+    Mirrors the TradingView overlay — Call Resistance / GEX 1-5 / HVL / Put Support,
+    0DTE variants, 1D Max/Min (IV expected move), and spot.
+    """
+    full = levels["full"]
+    zerod = levels["zerod"]
+
+    RED, GREEN, YEL, CYAN, ORANGE = "#e06666", "#5fd35f", "#f0e833", "#4dd0e1", "#ff9933"
+    L = []
+
+    def add(price, label, color, ls="-", lw=1.5, weight="normal"):
+        if price is None:
+            return
+        try:
+            if np.isnan(price):
+                return
+        except TypeError:
+            pass
+        L.append({"p": float(price), "label": label, "color": color,
+                  "ls": ls, "lw": lw, "w": weight})
+
+    add(full.get("call_wall"), "Call Resistance", RED, lw=2.2)
+    add(full.get("put_wall"), "Put Support", GREEN, lw=2.2)
+    add(full.get("zgl"), "HVL (Zero Gamma)", YEL, ls="--")
+    if zerod:
+        add(zerod.get("call_wall"), "Call Resistance 0DTE / Gamma Wall", RED)
+        add(zerod.get("put_wall"), "Put Support 0DTE", GREEN)
+        add(zerod.get("zgl"), "HVL 0DTE", YEL, ls=":")
+    for i, (k, net_v, gross_v) in enumerate(levels["gex_top5"], 1):
+        if i == 1:
+            add(k, f"GEX {i} (primary)", YEL, ls="--", lw=2.2, weight="bold")
+        else:
+            add(k, f"GEX {i}", CYAN, lw=1.3)
+    if em:
+        add(em[0], "1D Max", ORANGE)
+        add(em[1], "1D Min", ORANGE)
+    add(spot, "SPOT", CYAN, ls=":", lw=2.0, weight="bold")
+
+    fig, ax = plt.subplots(figsize=(11, 9), facecolor="#1a1a2e")
+    ax.set_facecolor("#1a1a2e")
+
+    prices = [x["p"] for x in L]
+    ymin, ymax = min(prices), max(prices)
+    pad = max((ymax - ymin) * 0.05, spot * 0.005)
+    ax.set_ylim(ymin - pad, ymax + pad)
+    ax.set_xlim(0, 1)
+
+    for x in L:
+        ax.axhline(x["p"], color=x["color"], ls=x["ls"], lw=x["lw"], alpha=0.85, zorder=1)
+
+    # De-collide labels: nudge text y (lines stay at true price)
+    mingap = (ymax - ymin + 2 * pad) * 0.028
+    order = sorted(L, key=lambda z: z["p"])
+    last_y = -1e18
+    for x in order:
+        ty = x["p"]
+        if ty - last_y < mingap:
+            ty = last_y + mingap
+        last_y = ty
+        ax.text(0.015, ty, f"{x['label']}  {x['p']:,.0f}",
+                transform=ax.get_yaxis_transform(), color=x["color"],
+                fontsize=9.5, va="center", ha="left", weight=x["w"], zorder=4,
+                bbox=dict(boxstyle="round,pad=0.15", fc="#0d0d1f", ec="none", alpha=0.65))
+
+    ax.set_title(f"SPX GEX LEVEL MAP  —  Spot {spot:,.2f}   {today.isoformat()}",
+                 color="white", fontsize=13)
+    ax.set_ylabel("Price", color="white")
+    ax.get_xaxis().set_visible(False)
+    ax.tick_params(colors="white")
+    for spine in ax.spines.values():
+        spine.set_color("#444444")
+    ax.grid(axis="y", alpha=0.12, color="white")
+    fig.tight_layout()
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=130, facecolor="#1a1a2e")
+    plt.close(fig)
+    return buf
+
+
 def build_text_report(
     spot: float,
     today: date,
@@ -437,9 +650,9 @@ def build_text_report(
     return "\n".join(lines)
 
 
-def build_levels_report(spot: float, levels: dict, today: date) -> str:
+def build_levels_report(spot: float, levels: dict, today: date, em: tuple | None = None) -> str:
     """MenthorQ-style named-levels block: Call Resistance / Put Support / HVL +
-    0DTE variants + GEX 1-5 magnets + regime read."""
+    0DTE variants + GEX 1-5 magnets + 1D expected move + regime read."""
     full = levels["full"]
     zerod = levels["zerod"]
     lines = ["```"]
@@ -447,7 +660,12 @@ def build_levels_report(spot: float, levels: dict, today: date) -> str:
     lines.append(f"SPX KEY GEX LEVELS  —  Spot {spot:,.2f}   {today.isoformat()}")
     lines.append("=" * 56)
     lines.append("")
-    lines.append("FULL CHAIN (all expirations):")
+    if em:
+        lines.append(f"1D EXPECTED MOVE (ATM IV {em[2]*100:.1f}%):")
+        lines.append(f"  1D Max               : {em[0]:>8,.0f}")
+        lines.append(f"  1D Min               : {em[1]:>8,.0f}")
+        lines.append("")
+    lines.append(f"NEAR-TERM (<= {NEAR_TERM_DTE} DTE):")
     if full["call_wall"] is not None:
         lines.append(f"  Call Resistance      : {full['call_wall']:>8,.0f}   ({fmt_gex(full['call_wall_v'])})")
     if full["put_wall"] is not None:
@@ -464,16 +682,16 @@ def build_levels_report(spot: float, levels: dict, today: date) -> str:
         if zerod["zgl"] is not None and not np.isnan(zerod["zgl"]):
             lines.append(f"  HVL 0DTE             : {zerod['zgl']:>8,.1f}")
         lines.append("")
-    lines.append("GEX 1-5 (top magnets, full chain):")
-    for i, (k, v) in enumerate(levels["gex_top5"], 1):
-        side = "CALL+" if v > 0 else "PUT- "
-        lines.append(f"  GEX {i}: {k:>8,.0f}   {side} {fmt_gex(abs(v))}")
+    lines.append("GEX 1-5 (top gamma walls near spot, by gross):")
+    for i, (k, net_v, gross_v) in enumerate(levels["gex_top5"], 1):
+        side = "CALL+" if net_v > 0 else "PUT- "
+        lines.append(f"  GEX {i}: {k:>8,.0f}   {side} {gross_v/1e9:.2f}B")
     lines.append("")
     lines.append("REGIME (spot vs HVL):")
     if full["zgl"] is not None and not np.isnan(full["zgl"]):
         d = spot - full["zgl"]
         reg = "LONG GAMMA (pin/dampen)" if d >= 0 else "SHORT GAMMA (vol expansion)"
-        lines.append(f"  Full chain : {d:+6.1f}   {reg}")
+        lines.append(f"  Near-term  : {d:+6.1f}   {reg}")
     if zerod is not None and zerod["zgl"] is not None and not np.isnan(zerod["zgl"]):
         d = spot - zerod["zgl"]
         reg = "LONG GAMMA (pin/dampen)" if d >= 0 else "SHORT GAMMA (vol expansion)"
@@ -503,6 +721,7 @@ def main():
         return
 
     df = compute_gex(df, spot)
+    df = add_dte(df, today)  # T (years to expiry) for the Black-Scholes gamma flip
     print(f"[GEX] spot={spot:.2f}  rows={len(df)}  expiries={df['expiry'].nunique()}")
 
     nearest, opex = pick_expiries(df, today)
@@ -520,14 +739,15 @@ def main():
     near_calls, near_puts = clip_strike_range(near_calls, near_puts, spot)
     opex_calls, opex_puts = clip_strike_range(opex_calls, opex_puts, spot)
 
-    # Per-expiry ZGLs for the panel annotations (computed on UNCLIPPED data for accuracy)
-    near_zgl, _ = zero_gamma_flip(*aggregate_strikes(near_df))
-    opex_zgl, _ = zero_gamma_flip(*aggregate_strikes(opex_df))
+    # Per-expiry HVL (Perfiliev BS gamma flip) for the panel annotations
+    near_zgl, _ = gamma_flip_bs(near_df, spot)
+    opex_zgl, _ = gamma_flip_bs(opex_df, spot)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 5), facecolor="#1a1a2e")
     render_panel(ax1, near_calls, near_puts, spot, f"SPX {nearest.isoformat()}", zgl=near_zgl)
     render_panel(ax2, opex_calls, opex_puts, spot, f"SPX OpEx ({opex.isoformat()})", zgl=opex_zgl)
-    ax2.legend(loc="upper right", facecolor="#1a1a2e", edgecolor="#444444", labelcolor="white")
+    ax1.legend(loc="upper right", facecolor="#1a1a2e", edgecolor="#444444", labelcolor="white", fontsize=8)
+    ax2.legend(loc="upper right", facecolor="#1a1a2e", edgecolor="#444444", labelcolor="white", fontsize=8)
     fig.tight_layout()
 
     buf = io.BytesIO()
@@ -538,15 +758,21 @@ def main():
     send_discord_text(report)
     send_discord_image(buf, f"spx_gex_{today.isoformat()}.png")
 
-    # MenthorQ-style named-levels post (full chain + 0DTE + GEX 1-5 + regime)
-    levels = compute_named_levels(df, near_df)
-    send_discord_text(build_levels_report(spot, levels, today))
+    # MenthorQ-style named-levels post (near-term structural + 0DTE + GEX 1-5 + 1D move + regime)
+    near_term_df = df[df["expiry"] <= today + timedelta(days=NEAR_TERM_DTE)]
+    levels = compute_named_levels(near_term_df, near_df, spot)
+    em = compute_expected_move(df, spot, nearest)
+    send_discord_text(build_levels_report(spot, levels, today, em))
+
+    # MenthorQ-style level map (horizontal lines on a price axis)
+    map_buf = render_levels_map(spot, levels, em, today)
+    send_discord_image(map_buf, f"spx_gex_map_{today.isoformat()}.png")
 
     # Evolution chart: max call / max put / max net GEX strike for today + next 10 expiries
     all_expiries = sorted(df["expiry"].unique())
     future_expiries = [e for e in all_expiries if e >= today][:11]
     if len(future_expiries) >= 2:
-        key = per_expiry_key_strikes(df, future_expiries)
+        key = per_expiry_key_strikes(df, future_expiries, spot)
         if not key.empty:
             evo_buf = render_evolution(key, spot)
             send_discord_image(evo_buf, f"spx_gex_evolution_{today.isoformat()}.png")

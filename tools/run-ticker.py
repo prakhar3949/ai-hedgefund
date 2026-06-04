@@ -82,6 +82,17 @@ def run_script(filename: str, label: str, tickers: list[str], timeout: int) -> b
 
 
 def main():
+    # Windows cp1252 console chokes on unicode chars (→, 🔻, etc.) in subprocesses'
+    # captured stdout when we echo it back. Subprocesses already get utf-8 via env,
+    # but the parent's own stdout needs reconfiguring too — otherwise tools that
+    # succeed are falsely tagged as ERROR when we try to print their output.
+    if sys.platform == "win32":
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+            sys.stderr.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
     if len(sys.argv) < 2:
         print("Usage: python run-ticker.py TICKER [TICKER ...]")
         print("Example: python run-ticker.py EXLS G AAPL")
