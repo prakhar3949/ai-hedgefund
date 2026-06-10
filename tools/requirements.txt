@@ -1,0 +1,14 @@
+# Finance Tools Suite — full dependency set
+# Covers every script run by run-all.py plus the GEX profiles (gex-profile.py,
+# gex-profile-equity.py, gamma-profile.py). Standard-library modules
+# (io, json, re, datetime, pathlib, zoneinfo, concurrent.futures, etc.) omitted.
+
+requests           # HTTP — Yahoo/CBOE/FRED fetches + Discord webhooks
+numpy              # array math (used across nearly all scanners)
+pandas             # OHLCV dataframes
+matplotlib         # headless (Agg) chart rendering
+scipy              # signal.argrelextrema, stats.norm, optimize.minimize
+yfinance           # FX + a few legacy scanners (Yahoo chart API preferred elsewhere)
+statsmodels        # macro-spx-model.py + spx_models regressions
+beautifulsoup4     # edgar-rate-sensitivity.py HTML parsing
+tzdata             # IANA tz database for zoneinfo on Windows

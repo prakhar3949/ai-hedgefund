@@ -154,12 +154,66 @@ def compute_gex(df: pd.DataFrame, spot: float) -> pd.DataFrame:
     return df
 
 
+def _easter(year: int) -> date:
+    """Easter Sunday (Anonymous Gregorian algorithm)."""
+    a = year % 19
+    b, c = divmod(year, 100)
+    d, e = divmod(b, 4)
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = divmod(c, 4)
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    mm = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * mm + 114) // 31
+    day = ((h + l - 7 * mm + 114) % 31) + 1
+    return date(year, month, day)
+
+
+def _third_friday(year: int, month: int) -> date:
+    """3rd Friday of the month — the standard US monthly options expiration."""
+    first = date(year, month, 1)
+    return first + timedelta(days=(4 - first.weekday()) % 7 + 14)
+
+
+def _is_market_holiday(d: date) -> bool:
+    """NYSE full-day closures that can fall on a 3rd Friday: Good Friday and
+    Juneteenth (observed). Other NYSE holidays never land on a mid-month Friday."""
+    if d == _easter(d.year) - timedelta(days=2):          # Good Friday
+        return True
+    if d.year >= 2022:                                     # Juneteenth (observed)
+        j = date(d.year, 6, 19)
+        wd = j.weekday()
+        obs = j - timedelta(days=1) if wd == 5 else j + timedelta(days=1) if wd == 6 else j
+        if d == obs:
+            return True
+    return False
+
+
+def _next_monthly_opex(today: date) -> date:
+    """Soonest standard monthly OpEx (3rd Friday, holiday-adjusted) that is >= today.
+    When the 3rd Friday is an exchange closure (e.g. Juneteenth, Good Friday) the
+    AM-settled monthly rolls back to the Thursday before."""
+    y, m = today.year, today.month
+    for _ in range(13):
+        fri = _third_friday(y, m)
+        opex = fri - timedelta(days=1) if _is_market_holiday(fri) else fri
+        if opex >= today:
+            return opex
+        m += 1
+        if m > 12:
+            m, y = 1, y + 1
+    return _third_friday(today.year, today.month)  # unreachable in practice
+
+
 def pick_expiries(df: pd.DataFrame, today: date) -> tuple[date | None, date | None]:
     """Return (nearest_expiry, opex_expiry).
 
     nearest_expiry: smallest expiry >= today, else None
-    opex_expiry: expiry within today+10..today+45 with highest total OI
-                 (falls back to first expiry >= today+10 if window empty)
+    opex_expiry: the next standard monthly OpEx (3rd Friday, holiday-adjusted),
+                 computed directly so an imminent monthly (<10 days out) is not
+                 skipped. Falls back to the highest-OI expiry in the today+10..+45
+                 window only when the computed monthly isn't listed in the chain.
     """
     expiries = sorted(df["expiry"].unique())
     if not expiries:
@@ -168,15 +222,24 @@ def pick_expiries(df: pd.DataFrame, today: date) -> tuple[date | None, date | No
     future = [e for e in expiries if e >= today]
     nearest = future[0] if future else None
 
-    window_lo = today + timedelta(days=10)
-    window_hi = today + timedelta(days=45)
-    candidates = [e for e in expiries if window_lo <= e <= window_hi]
-    if candidates:
-        oi_by_exp = df[df["expiry"].isin(candidates)].groupby("expiry")["oi"].sum()
-        opex = oi_by_exp.idxmax()
+    monthly = _next_monthly_opex(today)
+    if nearest is not None and monthly == nearest:
+        # Front expiry is itself the monthly — advance to next month's OpEx so
+        # the two panels stay distinct.
+        monthly = _next_monthly_opex(nearest + timedelta(days=1))
+
+    if monthly in expiries:
+        opex = monthly
     else:
-        later = [e for e in expiries if e >= window_lo]
-        opex = later[0] if later else (expiries[-1] if expiries else None)
+        window_lo = today + timedelta(days=10)
+        window_hi = today + timedelta(days=45)
+        candidates = [e for e in expiries if window_lo <= e <= window_hi]
+        if candidates:
+            oi_by_exp = df[df["expiry"].isin(candidates)].groupby("expiry")["oi"].sum()
+            opex = oi_by_exp.idxmax()
+        else:
+            later = [e for e in expiries if e >= window_lo]
+            opex = later[0] if later else (expiries[-1] if expiries else None)
 
     if nearest == opex:
         later = [e for e in expiries if e > nearest] if nearest else []
