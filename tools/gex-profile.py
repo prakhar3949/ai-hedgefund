@@ -19,6 +19,7 @@ Free, EOD-delayed 15-20 min, no API key.
 """
 
 import io
+import json
 import re
 import sys
 import requests
@@ -47,6 +48,9 @@ NEAR_TERM_DTE = 45
 
 # SPX option symbol: e.g. "SPXW260613C07450000" or "SPX260618P07000000"
 SYMBOL_RE = re.compile(r"^SPX[W]?(\d{2})(\d{2})(\d{2})([CP])(\d{8})$")
+
+# Persisted top-3 put-GEX watch dates from the previous run (for day-over-day diffing)
+PUT_WATCH_FILE = TOOLS_DIR / "gex-put-watch.json"
 
 
 def send_discord_text(message: str):
@@ -533,7 +537,151 @@ def per_expiry_key_strikes(df: pd.DataFrame, expiries: list[date], spot: float) 
     return pd.DataFrame(rows)
 
 
-def render_evolution(key: pd.DataFrame, spot: float) -> io.BytesIO:
+def top_put_watch_dates(key: pd.DataFrame, today: date, n: int = 3) -> pd.DataFrame:
+    """Top-n expiries by max-put-GEX magnitude from the evolution key-strikes table.
+
+    Today's expiry (0DTE) is excluded — it would occupy a slot every day and churn
+    the watch list on every run. Expiries whose put-GEX magnitudes are similar
+    (within 10% of each other) are treated as equivalent, and within such a group
+    the LOWEST put-wall strike wins (the deepest SPX level is the one to watch).
+    """
+    cand = key[(key["expiry"] > today) & (key["put_mag"] > 0)]
+    if cand.empty:
+        return cand
+    by_mag = cand.sort_values("put_mag", ascending=False)
+    # Walk down by magnitude, grouping rows within 10% of the group's leader;
+    # inside a group order by put_strike ascending, then take the top n overall.
+    ordered, group, leader = [], [], None
+    for _, r in by_mag.iterrows():
+        if leader is not None and r["put_mag"] < 0.9 * leader:
+            ordered.extend(sorted(group, key=lambda x: x["put_strike"]))
+            group, leader = [], None
+        if leader is None:
+            leader = r["put_mag"]
+        group.append(r)
+    ordered.extend(sorted(group, key=lambda x: x["put_strike"]))
+    top = pd.DataFrame(ordered[:n])
+    return top.sort_values("expiry").reset_index(drop=True)
+
+
+def load_put_watch() -> dict | None:
+    """Previous run's watch state, or None on first run / unreadable file."""
+    try:
+        with open(PUT_WATCH_FILE, encoding="utf-8") as f:
+            state = json.load(f)
+        if not isinstance(state.get("dates"), dict):
+            return None
+        return state
+    except Exception:
+        return None
+
+
+def save_put_watch(today: date, watch: pd.DataFrame):
+    state = {
+        "run_date": today.isoformat(),
+        "dates": {
+            r["expiry"].isoformat(): {
+                "put_strike": float(r["put_strike"]),
+                "put_mag": float(r["put_mag"]),
+            }
+            for _, r in watch.iterrows()
+        },
+    }
+    try:
+        with open(PUT_WATCH_FILE, "w", encoding="utf-8") as f:
+            json.dump(state, f, indent=2)
+    except Exception as e:
+        print(f"put-watch state save failed: {e}", file=sys.stderr)
+
+
+def diff_put_watch(prev: dict, watch: pd.DataFrame, today: date) -> list[str]:
+    """Day-over-day watch-list diff lines.
+
+    A date dropping out because it expired (or is today) is expected churn and gets
+    an informational note; a date dropping while still in the future means dealer
+    put positioning moved and gets the loud flag.
+    """
+    prev_dates = prev.get("dates", {})
+    cur = {r["expiry"].isoformat(): r for _, r in watch.iterrows()}
+    lines = []
+    changed = False
+    for d in sorted(set(prev_dates) - set(cur)):
+        try:
+            still_future = date.fromisoformat(d) > today
+        except ValueError:
+            still_future = False
+        if still_future:
+            lines.append(f"  ⚠ WATCH DATE CHANGED: {d} dropped while still in the future")
+            changed = True
+        else:
+            lines.append(f"  note: {d} left the watch (expired / is today)")
+    for d in sorted(set(cur) - set(prev_dates)):
+        r = cur[d]
+        lines.append(f"  ⚠ ADDED: {d}   put wall {r['put_strike']:,.0f}   {fmt_gex(-r['put_mag'])}")
+        changed = True
+    for d in sorted(set(cur) & set(prev_dates)):
+        r, p = cur[d], prev_dates[d]
+        ps = p.get("put_strike")
+        pm = fmt_gex(-p.get("put_mag", 0.0))
+        cm = fmt_gex(-r["put_mag"])
+        if ps is not None and abs(ps - float(r["put_strike"])) >= 0.5:
+            lines.append(f"  {d}: put wall moved {ps:,.0f} -> {r['put_strike']:,.0f}  (mag {pm} -> {cm})")
+        else:
+            lines.append(f"  {d}: put wall unchanged at {r['put_strike']:,.0f}  (mag {pm} -> {cm})")
+    if not changed:
+        lines.append("  watch dates unchanged")
+    return lines
+
+
+def build_put_watch_report(spot: float, today: date, watch: pd.DataFrame, prev: dict | None) -> str:
+    lines = ["```"]
+    lines.append("=" * 56)
+    lines.append(f"SPX PUT GEX WATCH  —  Spot {spot:,.2f}   {today.isoformat()}")
+    lines.append(f"Top {len(watch)} max-put-GEX expiries (next 10 trading days)")
+    lines.append("=" * 56)
+    lines.append("")
+    for rank, (_, r) in enumerate(watch.iterrows(), 1):
+        dte = (r["expiry"] - today).days
+        lines.append(
+            f"  #{rank}  {r['expiry'].isoformat()}  ({dte:>2}d)   "
+            f"put wall {r['put_strike']:>8,.0f}   {fmt_gex(-r['put_mag'])}"
+        )
+    lines.append("")
+    if prev is None:
+        lines.append("First run — watch dates saved; comparison starts next run.")
+    else:
+        lines.append(f"VS PREVIOUS RUN ({prev.get('run_date', '?')}):")
+        lines.extend(diff_put_watch(prev, watch, today))
+    lines.append("```")
+    return "\n".join(lines)
+
+
+def render_put_watch_chart(df: pd.DataFrame, exp: date, spot: float, rank: int,
+                           put_strike: float, today: date) -> io.BytesIO:
+    """Full-size GEX bar chart for one put-watch expiry, visually flagged orange."""
+    sub = df[df["expiry"] == exp]
+    calls, puts = aggregate_strikes(sub)
+    calls, puts = clip_strike_range(calls, puts, spot)
+    zgl, _ = gamma_flip_bs(sub, spot)
+    dte = (exp - today).days
+
+    fig, ax = plt.subplots(figsize=(14, 6), facecolor="#1a1a2e")
+    render_panel(ax, calls, puts, spot, "", zgl=zgl)
+    if not np.isnan(put_strike):
+        ax.axvline(put_strike, color="#ff9933", lw=2, ls="--", label=f"Max Put GEX {put_strike:,.0f}")
+    ax.set_title(f"PUT WATCH #{rank}  —  SPX {exp.isoformat()}  ({dte} DTE)",
+                 color="#ff9933", fontsize=13, weight="bold")
+    ax.legend(loc="upper right", facecolor="#1a1a2e", edgecolor="#444444", labelcolor="white", fontsize=8)
+    fig.patch.set_linewidth(4)
+    fig.tight_layout()
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=130, facecolor="#1a1a2e", edgecolor="#ff9933")
+    plt.close(fig)
+    return buf
+
+
+def render_evolution(key: pd.DataFrame, spot: float, watch_dates: list[date] | None = None) -> io.BytesIO:
     fig, ax = plt.subplots(figsize=(14, 7), facecolor="#1a1a2e")
     ax.set_facecolor("#1a1a2e")
 
@@ -571,6 +719,12 @@ def render_evolution(key: pd.DataFrame, spot: float) -> io.BytesIO:
     # Spot line
     ax.axhline(spot, color="#00d9ff", lw=1.2, ls="--", alpha=0.8)
     ax.text(x.iloc[-1], spot, f"  Spot {spot:,.2f}", color="#00d9ff", va="center", fontsize=9)
+
+    # Put-watch dates: vertical orange markers on the top-3 max-put-GEX expiries
+    if watch_dates:
+        for i, d in enumerate(watch_dates):
+            ax.axvline(pd.Timestamp(d), color="#ff9933", lw=1.5, ls="--", alpha=0.8,
+                       zorder=1, label="PUT WATCH" if i == 0 else None)
 
     ax.set_title("SPX — Key Strike Evolution with GEX Magnitude Bubbles\nToday + Next 10 Trading Days",
                  color="white", fontsize=13)
@@ -837,9 +991,22 @@ def main():
     if len(future_expiries) >= 2:
         key = per_expiry_key_strikes(df, future_expiries, spot)
         if not key.empty:
-            evo_buf = render_evolution(key, spot)
+            # Put-GEX watch: top 3 future expiries by max-put-GEX magnitude
+            watch = top_put_watch_dates(key, today)
+            evo_buf = render_evolution(key, spot, watch_dates=list(watch["expiry"]) if not watch.empty else None)
             send_discord_image(evo_buf, f"spx_gex_evolution_{today.isoformat()}.png")
             print(f"[GEX] evolution chart sent ({len(key)} expiries)")
+
+            if watch.empty:
+                print("[GEX] put-watch: no future expiries with put gamma — section skipped", file=sys.stderr)
+            else:
+                prev = load_put_watch()
+                send_discord_text(build_put_watch_report(spot, today, watch, prev))
+                for rank, (_, r) in enumerate(watch.iterrows(), 1):
+                    wbuf = render_put_watch_chart(df, r["expiry"], spot, rank, r["put_strike"], today)
+                    send_discord_image(wbuf, f"spx_gex_putwatch{rank}_{r['expiry'].isoformat()}.png")
+                save_put_watch(today, watch)
+                print(f"[GEX] put-watch sent ({len(watch)} dates: {[e.isoformat() for e in watch['expiry']]})")
     print("[GEX] done")
 
 

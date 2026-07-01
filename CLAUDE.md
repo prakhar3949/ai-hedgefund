@@ -1,7 +1,7 @@
 # Project: Finance Tools Suite
 
 ## Overview
-A suite of Python-based finance analysis tools that fetch market/economic data and post results to Discord via webhooks. Located at `d:\Deepseek-ollama\finance\ai-hedgefund\tools\`.
+A suite of Python-based finance analysis tools that fetch market/economic data and post results to Discord via webhooks. Located at `d:\AI-finance\ai-hedgefund\tools\`.
 
 ## Behavioral Guidelines
 
@@ -45,9 +45,9 @@ Define success criteria. Loop until verified.
 
 ## Project Structure
 ```
-d:\Deepseek-ollama\
-├── CLAUDE.md                          ← this file
-├── finance/ai-hedgefund/
+d:\AI-finance\
+└── ai-hedgefund/
+│   ├── CLAUDE.md                      ← this file
 │   ├── tools/                         ← all runnable scripts live here
 │   │   ├── run-all.py                 ← master runner (executes all scripts sequentially)
 │   │   ├── watchlist.json             ← shared ticker list (26 Purple list tickers)
@@ -177,7 +177,7 @@ Key series: GDP, CPIAUCSL (CPI), UNRATE, PAYEMS (NFP), RSAFS (Retail Sales), CES
 All scripts use project-relative paths:
 ```python
 TOOLS_DIR = Path(__file__).resolve().parent
-PROJECT_DIR = TOOLS_DIR.parent.parent  # d:\Deepseek-ollama\finance\ai-hedgefund
+PROJECT_DIR = TOOLS_DIR.parent.parent  # d:\AI-finance
 ```
 **Never use** `~/.clawd/` or `Path.home() / "clawd"` — those are Linux-only and don't exist on this Windows machine.
 
@@ -620,6 +620,35 @@ Dual format — both `tickers` array and `stocks.holdings` dict:
     - **Parabolic blowoff with rising volume** (e.g. ^IXIC Feb-Mar 2000) — the scanner detects waning (vol declining) but parabolic tops show vol *rising* into the peak (FOMO buying). Distinct pattern that needs a separate detector (extended uptrend + 30d gain very high + rising vol + distribution candles). Out of scope for v2.
     - **Downside thrust in established downtrend** (e.g. ^IXIC Apr 14 2000, -9.67% panic continuation) — wide-range bearish bar in DOWNTREND with huge vol but no reversal candle. Real pattern (trend acceleration) but doesn't fit the three-regime taxonomy. Would need a `DOWNSIDE_THRUST` warning tier.
 
+32. **Cyclical-aware valuation profiles in `fundamentals-scanner.py`** — sector/sub-sector P/E lens + cycle-position read.
+    - **Core thesis encoded**: P/E is only reliable for stable-earnings (DEFENSIVE) businesses. For CYCLICALS a *low trailing P/E usually means PEAK earnings* (a top, not a bargain) and a *high P/E often means TROUGH earnings* (a bottom). So cyclical profiles de-weight P/E and lean on EV/Sales + P/Book + EV/EBITDA (monotonic across the cycle).
+    - **`PROFILES` registry** (replaces the old 3-branch `get_val_weights`): per sector AND sub-sector, defines `weights=(ev_ebitda, fwd_pe, pb, ev_sales)` (sum to 1.0), `pe_mode` ∈ {`reliable`, `growth`, `cyclical`, `book`, `nm`}, `cyc` cyclicality label, and a `pe_note` (the human-readable "when low/high P/E is good" guidance, surfaced as a `P/E LENS` line in the Discord sector-context post).
+      - Defensive (XLP/XLU/XLV) → `reliable`, P/E-weighted, LOW P/E = genuinely cheap.
+      - Growth (XLK/XLC) → `growth`, FWD-P/E-weighted, HIGH P/E OK if growth supports it.
+      - Cyclical (XLI/XLY/XLE/XLB) → `cyclical`, EV/Sales + P/B + EV/EBITDA weighted, P/E down-weighted.
+      - Financials (XLF/banks/insurance) → `book`, EV weights = 0 (deposits/float make EV meaningless), P/Book + ROE primary.
+      - Real Estate (XLRE) → `nm`, P/E not meaningful (D&A), P/Book heavy (P/FFO not in feed).
+    - **Sub-sector overrides** (`ETF_PROFILE` + `--profile` CLI flag): the 11 CW sectors are too coarse for the right P/E lens — `IYT/XTN→transport`, `JETS→airlines`, `KRE→banks`, `KIE/IAK→insurance`, `GDX/SIL/SLX→metals_mining`. Auto-detected when scanning those ETF buckets; forced via `python fundamentals-scanner.py --profile transport LSTR XPO ODFL KNX JBHT` (the CLI custom bucket otherwise resolves to `UNKNOWN`, which is now treated as conservatively-cyclical instead of generic). `--profile` is validated case-insensitively against the registry; bad value warns + lists valid + falls back to auto-resolve.
+    - **`cycle_position(m)`** — cycle-position read from forward-vs-trailing P/E: `fwd << trailing` → RECOVERY (earnings rising, trailing P/E understates); `fwd >> trailing` → LATE/PEAK (low trailing P/E is a trap); negative trailing + positive forward → TROUGH; falls back to next-FY EPS-growth sign when the P/E pair is unusable; UNKNOWN otherwise. Surfaced as a `Cycle` column in sector extras and a per-ticker "Cycle position" block — **cyclicals only** (defensives omit it).
+    - **Transport overlay**: Operating Ratio = `1 − operating_margin` (LOWER = better — the #1 carrier metric) added to extras. **Tonnage/yield decomposition deliberately NOT added** — that's segment-level operating data not present in the Yahoo `quoteSummary` feed (financialData/defaultKeyStatistics/earningsTrend); faking it from snapshot data would mislead. Airlines additionally get `NetDebt/EBITDA` (leverage matters in deep cyclicals).
+    - **Insurance overlay** (`insurance` profile, `book` mode): P/Book + ROE + Net Margin + **Combined Ratio + Loss Ratio reconstructed from SEC EDGAR XBRL** (the key P&C metrics are NOT in the Yahoo feed). EV weights = 0 (investment float, not operating debt). `book` mode *suppresses* the cycle-position read by design, so a catastrophe-year EPS collapse isn't mislabeled TROUGH/RECOVERY. P/E-lens note warns that insurance *brokers* (MMC/AON/AJG/BRO) + life insurers lack a P&C combined ratio (show N/A) and should be read on P/E (accepted limitation — one profile can't fit underwriters + brokers + life).
+      - **Combined Ratio via EDGAR** (`fetch_combined_ratio`, `_edgar_annual`, `enrich_combined_ratios`): GAAP proxy = `BenefitsLossesAndExpenses / PremiumsEarnedNet` (<100% = underwriting profit); Loss Ratio = `PolicyholderBenefitsAndClaimsIncurredNet` (fallback `IncurredClaimsPropertyCasualtyAndLiability`) `/ PremiumsEarnedNet`. Ticker→CIK from `company_tickers.json` (cached in-process); annual values via SEC's deduped `CY####` frames with a 10-K full-year (~365d) fallback; numerator/denominator aligned on the latest common fiscal year within 1y of the latest premium report. Validated vs PGR's reported ~89% combined. The loss/expense *split* is unreliable across insurers (tag inconsistency) so only the **total** combined + loss ratio are shown. Fetched only for the `insurance` profile (parallel, 4 workers, before scoring); never blocks other sectors.
+      - **Quality sub-score is profile-aware** (`score_cohort`): insurers have meaningless ROIC/margins (float), so the 35-pt Quality block is recomputed for `insurance` as **Combined Ratio (55%, lower=better) + ROE (45%, higher=better)** instead of ROIC-WACC-spread + gross/op margin. Effect on the P&C cohort: AIG (cheap but 96.4% CR / 7.7% ROE) drops 76→63 (quality 5.5/35); PGR (premium 3.7× P/B but 37.9% ROE / 89.9% CR) rises 25→42 (quality 27.8/35, the highest); CB rises on its 87.4% best-in-class combined. Names missing combined ratio (WRB/MKL) get neutral on that component and are scored on ROE alone. NB: Yahoo's `returnOnEquity` is an occasionally-distorted TTM figure (e.g. ALL 45%) — a known input caveat.
+    - **Scoring change**: valuation sub-score extended from 3 inputs to 4 (added EV/Sales percentile rank); all four weighted per-profile.
+
+    **Worst-case stress test** (done before coding):
+    1. **Forward P/E missing** (no estimates) → cycle read falls back to next-FY EPS-growth sign; else UNKNOWN. No crash.
+    2. **Negative trailing P/E** (loss-making cyclical at trough, e.g. KNX) → fwd/trailing ratio meaningless; detected and labeled TROUGH.
+    3. **Operating margin missing for transport** → Oper Ratio shows N/A, other metrics unaffected.
+    4. **`--profile` typo** → case-insensitive validation; warns + lists valid + falls back to auto-resolve (no crash).
+    5. **Cyclical low-P/E trap still scores well** (score uses forward P/E, cheap=high rank) → mitigated by (a) down-weighting P/E for cyclicals, (b) surfacing the LATE/PEAK flag so the human sees the trap. Documented: score is cohort-relative valuation, NOT a cycle-timing call.
+    6. **EV/Sales unfair across mixed-margin cohort** (asset-light LSTR vs asset-heavy ODFL) → EV/Sales is 1 of 4 valuation inputs; EV/EBITDA + Operating Ratio retained.
+    7. **Financials/REITs routed through EV/Sales path** (EV meaningless — deposits as "debt") → those profiles set EV weights to 0, rely on P/Book + ROE / P/FFO.
+    8. **<2 tickers in cohort** → existing neutral-50 guard; cycle flags still computed (absolute, per-stock).
+    9. **Insurer lacks the aggregate `BenefitsLossesAndExpenses` tag** (e.g. WRB) → combined ratio = "N/A (no aggr tag)" but Loss Ratio still shown from the losses-incurred tag. Brokers/holding-cos with no premiums tag (MKL) → "N/A (life/broker)".
+    10. **SEC EDGAR down / rate-limited / CIK lookup fails** → `_load_cik_map`/`_edgar_annual` swallow exceptions and return empty; combined ratio shows N/A; the rest of the insurance scan is unaffected (EDGAR fetched only for `insurance` profile, in a try/except per ticker).
+    11. **Stale XBRL** (loss tag stops at an old year, e.g. MKL) → staleness guard requires the aligned fiscal year ≥ latest-premium-year − 1, else N/A (no stale ratio printed).
+
 ## CI/CD — GitHub Actions
 Automated daily run via GitHub Actions. Workflow file: `.github/workflows/finance-tools.yml`
 
@@ -638,7 +667,7 @@ Automated daily run via GitHub Actions. Workflow file: `.github/workflows/financ
 
 ## Environment
 - **OS**: Windows 11 Home
-- **Python**: venv at `d:\Deepseek-ollama\venv\`
+- **Python**: venv `prakhar` at `d:\AI-finance\ai-hedgefund\prakhar\` (Python 3.12; deps in `tools\requirements.txt`)
 - **Platform**: win32 — use forward slashes or `Path()` for paths, never hardcode Linux paths
 - **Timezone**: All time displays use `America/New_York` (ET)
 

@@ -1,0 +1,27 @@
+name: GEX Profile Daily Run
+
+on:
+  schedule:
+    # 6:00 PM IST = 12:30 PM UTC (IST is UTC+5:30, no DST)
+    - cron: "30 12 * * *"
+  workflow_dispatch:
+
+jobs:
+  gex-profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r tools/requirements-ci.txt
+
+      - name: Run gex-profile.py
+        working-directory: tools
+        run: python gex-profile.py

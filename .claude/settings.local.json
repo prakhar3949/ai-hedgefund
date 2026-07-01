@@ -18,7 +18,10 @@
       "Bash(python volume-exhaustion-scanner.py NVDA TSLA PFE COST RDDT GME)",
       "Bash(python volume-exhaustion-scanner.py NVDA TSLA AAPL PFE)",
       "Bash(python _test_oi_metrics.py)",
-      "Bash(python volume-exhaustion-scanner.py NVDA AAPL)"
+      "Bash(python volume-exhaustion-scanner.py NVDA AAPL)",
+      "Bash(python macro_tracker.py)",
+      "Bash(python macro_tracker_fill.py)",
+      "Bash(python -c ' *)"
     ]
   }
 }
