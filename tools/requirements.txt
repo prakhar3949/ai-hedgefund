@@ -11,4 +11,5 @@ scipy              # signal.argrelextrema, stats.norm, optimize.minimize
 yfinance           # FX + a few legacy scanners (Yahoo chart API preferred elsewhere)
 statsmodels        # macro-spx-model.py + spx_models regressions
 beautifulsoup4     # edgar-rate-sensitivity.py HTML parsing
+pdfplumber         # schedule-fa.py PDF annual statement parsing
 tzdata             # IANA tz database for zoneinfo on Windows

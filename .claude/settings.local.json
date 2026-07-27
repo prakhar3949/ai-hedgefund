@@ -21,7 +21,18 @@
       "Bash(python volume-exhaustion-scanner.py NVDA AAPL)",
       "Bash(python macro_tracker.py)",
       "Bash(python macro_tracker_fill.py)",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(ls -d /d/AI-finance*)",
+      "Read(//d/AI-finance/**)",
+      "Bash(find /d -maxdepth 2 -type d -iname \"*finance2*\")",
+      "Bash(git add *)",
+      "Bash(git push *)",
+      "Bash(gh workflow *)",
+      "Bash(curl -s \"https://api.github.com/repos/prakhar3949/ai-finance2/contents/.github/workflows/gex-profile.yml?ref=main\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"https://raw.githubusercontent.com/prakhar3949/ai-finance2/main/.github/workflows/gex-profile.yml\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"https://api.github.com/repos/prakhar3949/ai-finance2\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"https://api.github.com/repos/prakhar3949/ai-finance2/contents/.github/workflows/gex-profile.yml?ref=main\")",
+      "Read(//c/Users/goyal/**)"
     ]
   }
 }
