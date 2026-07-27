@@ -64,6 +64,7 @@ logs/
 
 # Python
 venv/
+prakhar/
 __pycache__/
 *.pyc
 
